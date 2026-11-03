@@ -23,6 +23,6 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   [search,turno,status].forEach(function(el){ if(el){ el.addEventListener('input',applyFilters); el.addEventListener('change',applyFilters); } });
   document.querySelectorAll('[data-escala-clear]').forEach(function(btn){ btn.addEventListener('click',function(){ if(search)search.value=''; if(turno)turno.value=''; if(status)status.value=''; applyFilters(); }); });
-  document.querySelectorAll('[data-view-mode]').forEach(function(btn){ btn.addEventListener('click',function(){ var mode=btn.dataset.viewMode; localStorage.setItem('escala:view',mode); if(cardView)cardView.hidden=mode==='table'; if(tableView)tableView.hidden=mode!=='table'; document.querySelectorAll('[data-view-mode]').forEach(function(b){b.classList.toggle('is-active',b.dataset.viewMode===mode);}); }); });
-  var preferred=localStorage.getItem('escala:view')||'cards'; var initial=document.querySelector('[data-view-mode="'+preferred+'"]'); if(initial) initial.click();
+  document.querySelectorAll('[data-view-mode]').forEach(function(btn){ btn.addEventListener('click',function(){ var mode=btn.dataset.viewMode; try{localStorage.setItem('escala:view',mode);}catch(_){} if(cardView)cardView.hidden=mode==='table'; if(tableView)tableView.hidden=mode!=='table'; document.querySelectorAll('[data-view-mode]').forEach(function(b){b.classList.toggle('is-active',b.dataset.viewMode===mode);}); }); });
+  var preferred='cards';try{preferred=localStorage.getItem('escala:view')||'cards';}catch(_){} if(!['cards','table'].includes(preferred))preferred='cards'; var initial=document.querySelector('[data-view-mode="'+preferred+'"]'); if(initial) initial.click();
 });

@@ -1,6 +1,7 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
 <link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
   const fmtMin = (value) => { const n=Math.max(0,Number(value||0)); return `${Math.floor(n/60)}h${String(n%60).padStart(2,'0')}`; };
   const lista = Array.isArray(pendentes) ? pendentes : [];
@@ -28,9 +29,11 @@
 <div class="escala-page">
   <div class="approval-page">
   <header class="escala-head">
-    <div><h1><%= canDeleteHorasExtras ? 'Horas Extras Lançadas' : 'Horas Extras Pendentes' %></h1><p>Aprovação rápida, rastreabilidade, localização e horários exibidos no padrão brasileiro.</p></div>
+    <div><h1><%= canDeleteHorasExtras ? 'Horas Extras Lançadas' : 'Horas Extras Pendentes' %></h1><p>Confira e aprove os registros da equipe.</p></div>
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a><a class="btn" href="/escala/banco-horas">Banco de Horas</a></div>
   </header>
+
+  <%- include('_tabs',{escalaTab:'extras'}) %>
 
   <section class="escala-kpis">
     <div class="escala-kpi"><span>Pendentes</span><strong><%= fila.length %></strong><small>Aguardando decisão</small></div>
@@ -39,18 +42,12 @@
     <div class="escala-kpi"><span>Total pendente</span><strong><%= fmtMin(pendMinutes) %></strong><small>Soma aguardando aprovação</small></div>
   </section>
 
-  <nav class="escala-tabs">
-    <a class="escala-tab" href="/escala">Painel da Equipe</a>
-    <a class="escala-tab" href="/escala/completa">Escalas</a>
-    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
-    <a class="escala-tab is-active" href="/escala/hora-extra/pendentes">Horas Extras</a>
-    <a class="escala-tab" href="/escala/ausencias">Ausências</a>
-  </nav>
 
-  <div class="escala-notice is-info"><strong>Horário de Brasília.</strong> Datas são exibidas em DD/MM/AAAA e horários em HH:mm. Quando o aparelho fornecer GPS, início e finalização aparecem abaixo para conferência. A localização é apoio de rastreabilidade e não reprova automaticamente um lançamento.</div>
+
+
 
   <section class="escala-section">
-    <div class="escala-section-head"><div><h2>Fila de validação</h2><p>Fila de aprovação operacional; somente o que precisa de decisão aparece em destaque.</p></div><span class="approval-counter"><%= fila.length %> pendente(s)</span></div>
+    <div class="escala-section-head"><div><h2>Fila de validação</h2><p></p></div><span class="approval-counter"><%= fila.length %> pendente(s)</span></div>
     <% if(!fila.length){ %><div class="escala-empty">Nenhuma hora extra aguardando aprovação.</div><% } %>
     <div class="approval-grid">
       <% fila.forEach(h=>{ const geoInicio=geoInfo(h,'inicio'); const geoFim=geoInfo(h,'fim'); %>

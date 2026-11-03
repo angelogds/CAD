@@ -1,7 +1,9 @@
 const db = require("../../database/db");
-const { classificarLocalizacao, STATUS_LOCALIZACAO } = require("./escala.geo");
+const { classificarLocalizacao, STATUS_LOCALIZACAO, exigirLocalizacao } = require("./escala.geo");
 const { getAgoraSaoPauloParts, getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 const dateBr = require("../../utils/data-hora-br");
+const retencao = require("./escala.retencao.service");
+const visibilidadeEscala = (alias = "c") => retencao.sqlVisibilidade(db, alias);
 
 
 function tableExists(tableName) {
@@ -45,6 +47,7 @@ function isColaboradorAtivo(row = {}) {
   const status = normalizarNome(row.status || 'ativo');
   if (Number(row.ativo ?? 1) !== 1) return false;
   if (row.deleted_at) return false;
+  if (Number(row.fora_escala || 0) === 1) return false;
   if (row.excluido !== undefined && Number(row.excluido || 0) === 1) return false;
   if (row.is_active !== undefined && Number(row.is_active ?? 1) !== 1) return false;
   if (row.visivel !== undefined && Number(row.visivel ?? 1) !== 1) return false;
@@ -268,7 +271,7 @@ function getLinhasSemanaComStatus(semanaId, dateRef) {
     SELECT a.id AS alocacao_id, a.tipo_turno, a.observacao,
            c.id AS colaborador_id, c.nome, c.funcao
     FROM escala_alocacoes a
-    JOIN colaboradores c ON c.id = a.colaborador_id
+    JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()}
     WHERE a.semana_id = ?
     ORDER BY
       CASE a.tipo_turno
@@ -340,7 +343,7 @@ function getSemanaById(id) {
     SELECT a.id, a.tipo_turno, a.observacao,
            c.nome, c.id AS colaborador_id
     FROM escala_alocacoes a
-    JOIN colaboradores c ON c.id = a.colaborador_id
+    JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()}
     WHERE a.semana_id = ?
     ORDER BY c.nome
   `).all(id);
@@ -382,7 +385,7 @@ function listarEscalaCompleta({ dataInicio, dataFim } = {}) {
     const alocs = db.prepare(`
       SELECT a.tipo_turno, c.nome
       FROM escala_alocacoes a
-      JOIN colaboradores c ON c.id = a.colaborador_id
+      JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()}
       WHERE a.semana_id=?
     `).all(s.id);
 
@@ -410,8 +413,9 @@ function ensureColaborador(nome, funcao = "mecanico") {
 
   const f = normalizeFuncao(funcao) || "mecanico";
 
-  const row = db.prepare(`SELECT id, funcao FROM colaboradores WHERE lower(nome)=lower(?) LIMIT 1`).get(n);
+  const row = db.prepare(`SELECT * FROM colaboradores WHERE lower(nome)=lower(?) LIMIT 1`).get(n);
   if (row?.id) {
+    if (!retencao.disponivel(db, row.id)) throw new Error('Colaborador excluído da Escala.');
     if (row.funcao !== f) {
       db.prepare(`UPDATE colaboradores SET funcao=? WHERE id=?`).run(f, row.id);
     }
@@ -618,7 +622,7 @@ function listarAusencias({ dateISO, limit = 200 } = {}) {
              ec.fim,
              ec.motivo
       FROM escala_concessoes ec
-      JOIN colaboradores c ON c.id = ec.colaborador_id
+      JOIN colaboradores c ON c.id=ec.colaborador_id AND ${visibilidadeEscala()}
       ORDER BY ec.inicio DESC, ec.id DESC
       LIMIT ?
     `).all(maxRows)
@@ -810,7 +814,7 @@ function getEscalaSemanalPdfData() {
     const linhas = db.prepare(`
       SELECT a.tipo_turno, c.nome, c.funcao
       FROM escala_alocacoes a
-      JOIN colaboradores c ON c.id = a.colaborador_id
+      JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()}
       WHERE a.semana_id = ?
       ORDER BY c.nome ASC
     `).all(s.id);
@@ -861,7 +865,7 @@ function getPeriodoCompensacaoData(start, end) {
            cp.distancia_inicio_metros, cp.distancia_fim_metros, cp.justificativa_sem_localizacao, cp.alerta_localizacao,
            c.nome AS colaborador, c.funcao
     FROM escala_compensacoes cp
-    JOIN colaboradores c ON c.id = cp.colaborador_id
+    JOIN colaboradores c ON c.id=cp.colaborador_id AND ${visibilidadeEscala()}
     ${usePeriodo ? 'WHERE cp.data_servico BETWEEN ? AND ?' : ''}
     ORDER BY cp.data_servico ASC, c.nome ASC
   `;
@@ -915,7 +919,7 @@ function getPeriodoCompensacaoData(start, end) {
            cp.status_localizacao_inicio, cp.status_localizacao_fim, cp.precisao_inicio, cp.precisao_fim,
            cp.distancia_inicio_metros, cp.distancia_fim_metros, cp.justificativa_sem_localizacao, cp.alerta_localizacao
     FROM escala_concessoes ec
-    JOIN colaboradores c ON c.id = ec.colaborador_id
+    JOIN colaboradores c ON c.id=ec.colaborador_id AND ${visibilidadeEscala()}
     LEFT JOIN escala_compensacoes cp ON cp.id = ec.ref_compensacao_id
     ${usePeriodo ? 'WHERE NOT (ec.fim < ? OR ec.inicio > ?)' : ''}
     ORDER BY ec.inicio ASC, c.nome ASC
@@ -978,7 +982,7 @@ function getUsersDoTurnoAtual({ prefer = "auto" } = {}) {
   const rows = db.prepare(`
     SELECT DISTINCT u.id, u.name, c.id AS colaborador_id, c.funcao, a.tipo_turno
     FROM escala_alocacoes a
-    JOIN colaboradores c ON c.id = a.colaborador_id
+    JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()}
     JOIN users u ON u.id = c.user_id
     WHERE a.semana_id = ?
       AND a.tipo_turno IN ('diurno','noturno','apoio','plantao')
@@ -1051,7 +1055,7 @@ function getUsersDoTurno(turno) {
            IFNULL(${hasEhReserva ? "c.eh_reserva" : "0"}, 0) AS eh_reserva,
            a.tipo_turno
     FROM escala_alocacoes a
-    JOIN colaboradores c ON c.id = a.colaborador_id
+    JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()}
     JOIN users u ON u.id = c.user_id
     WHERE a.semana_id = ?
       AND IFNULL(c.ativo,1) = 1
@@ -1107,7 +1111,7 @@ function getDisponiveisAgora() {
              1 AS disponivel_agora
       FROM escala_semanas s
       JOIN escala_alocacoes a ON a.semana_id = s.id
-      JOIN colaboradores c ON c.id = a.colaborador_id AND IFNULL(c.ativo, 1) = 1
+      JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()} AND IFNULL(c.ativo, 1) = 1
       JOIN users u ON u.id = c.user_id
       WHERE ? BETWEEN s.data_inicio AND s.data_fim
         AND a.tipo_turno IN (?, 'apoio', 'plantao')
@@ -1210,7 +1214,7 @@ function canManageBancoHoras(user) { return ['ADMIN','ENCARREGADO_MANUTENCAO','M
 function canIniciarHoraExtraDesde17(user) {
   // MANUTENCAO é um perfil genérico legado e não autoriza este lançamento.
   const role = userRole({ role: String(user?.role || user?.perfil || '').trim() });
-  return ['ADMIN', 'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_MANUTENCAO', 'ENCARREGADO_DE_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'SUPERVISOR_MANUTENCAO'].includes(role);
+  return ['ADMIN', 'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_MANUTENCAO', 'ENCARREGADO_DE_MANUTENCAO'].includes(role);
 }
 function canReadBancoHoras(user) { return canManageBancoHoras(user) || ['RH','DIRETORIA'].includes(userRole(user)); }
 function minutosToHoras(minutos) { const m = Math.abs(Number(minutos)||0); const sign = Number(minutos)<0 ? '-' : ''; return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; }
@@ -1288,7 +1292,7 @@ function listarColaboradoresDaEscalaDaSemana({ dateISO = isoToday(), colaborador
            ${uAvatar}
     FROM escala_semanas s
     JOIN escala_alocacoes a ON a.semana_id = s.id
-    JOIN colaboradores c ON c.id = a.colaborador_id
+    JOIN colaboradores c ON c.id=a.colaborador_id AND ${visibilidadeEscala()}
     ${joinUser}
     WHERE ? BETWEEN s.data_inicio AND s.data_fim
       ${whereOwn}
@@ -1317,7 +1321,7 @@ function listarPainelEscala({ user = null, canViewAll = false, colaboradorId = n
     return { pendentes: 0, colaboradores: [] };
   }
 
-  const pendentes = tableExists('escala_horas_extras') ? db.prepare("SELECT COUNT(*) AS total FROM escala_horas_extras WHERE status='PENDENTE_APROVACAO'").get().total : 0;
+  const pendentes = tableExists('escala_horas_extras') ? db.prepare(`SELECT COUNT(*) AS total FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id AND ${visibilidadeEscala()} WHERE he.status='PENDENTE_APROVACAO'`).get().total : 0;
   const rows = deduplicarColaboradoresEscala(listarColaboradoresDaEscalaDaSemana({ dateISO: hoje, colaboradorId: ownColaboradorId }));
 
   const cards = rows.map((c) => {
@@ -1359,7 +1363,7 @@ function listarColaboradoresManutencao() {
   const excluidoCol = cols.includes('excluido') ? 'AND IFNULL(excluido,0)=0' : '';
   const demoCol = cols.includes('is_demo') ? 'AND IFNULL(is_demo,0)=0' : '';
   const foraEscalaCol = cols.includes('fora_escala') ? 'AND IFNULL(fora_escala,0)=0' : '';
-  const rows = db.prepare(`SELECT * FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ${deletedCol} ${excluidoCol} ${demoCol} ${foraEscalaCol} AND lower(nome) NOT LIKE '%demo%' AND lower(nome) NOT LIKE '%teste%' ORDER BY nome`).all();
+  const rows = db.prepare(`SELECT * FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ${deletedCol} ${excluidoCol} ${demoCol} ${foraEscalaCol} AND ${visibilidadeEscala("colaboradores")} AND lower(nome) NOT LIKE '%demo%' AND lower(nome) NOT LIKE '%teste%' ORDER BY nome`).all();
   const dedup = deduplicarColaboradoresEscala(rows);
   return dedup.map((row) => ({ ...row, nome: colaboradorNomeOficial(row), foto_path: row.foto_path || row.foto || null, user_id: cols.includes('user_id') ? row.user_id : null }));
 }
@@ -1367,7 +1371,7 @@ function listarColaboradoresManutencao() {
 function buscarColaboradorDoUsuario(userId) {
   if (!userId || !tableExists('colaboradores')) return null;
   const cols = db.prepare('PRAGMA table_info(colaboradores)').all().map((c) => c.name);
-  const activeFilter = "IFNULL(ativo,1)=1";
+  const activeFilter = `IFNULL(ativo,1)=1 AND ${visibilidadeEscala("colaboradores")}`;
   if (cols.includes('user_id')) {
     const row = db.prepare(`SELECT * FROM colaboradores WHERE user_id=? AND ${activeFilter} LIMIT 1`).get(userId);
     if (row) return row;
@@ -1404,23 +1408,27 @@ function listarOsDisponiveisParaHoraExtra() {
 }
 
 function buscarHoraExtraEmAndamento(colaboradorId) {
-  if (!tableExists('escala_horas_extras')) return null;
+  if (!tableExists('escala_horas_extras') || !retencao.disponivel(db, colaboradorId)) return null;
   return db.prepare("SELECT * FROM escala_horas_extras WHERE colaborador_id=? AND status='EM_ANDAMENTO' LIMIT 1").get(colaboradorId);
 }
 
-function getHoraExtra(id) { return db.prepare('SELECT * FROM escala_horas_extras WHERE id=?').get(id); }
+function getHoraExtra(id) { return db.prepare(`SELECT he.* FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id AND ${visibilidadeEscala()} WHERE he.id=?`).get(id); }
 function buscarHoraExtraPorId(id) { return getHoraExtra(id); }
 function filePath(file) { return file ? `/uploads/escala-horas/${file.filename}` : null; }
 
 function registrarInicioHoraExtra(dados, inicioFixo17h = false) {
   const colaboradorId = Number(dados.colaborador_id); if (!colaboradorId) throw new Error('Colaborador obrigatório.');
+  const colaborador=db.prepare('SELECT * FROM colaboradores WHERE id=?').get(colaboradorId);
+  if(!colaborador||!isColaboradorAtivo(colaborador)||!retencao.disponivel(db,colaboradorId))throw new Error('Colaborador fora da Escala ou inativo.');
+  const geo=exigirLocalizacao(dados,'inicio');
   const descricao = String(dados.descricao_servico||'').trim();
   const osId = Number(dados.os_id || 0) || null;
   if (!osId && !descricao) throw new Error('Informe uma OS ou descreva o serviço realizado.');
   const os = osId ? db.prepare('SELECT id, equipamento_id FROM os WHERE id=?').get(osId) : null;
   if (osId && !os) throw new Error('OS selecionada não foi encontrada ou não está disponível para hora extra.');
   const now = new Date(); const iso = now.toISOString();
-  const dataServico = inicioFixo17h ? getAgoraSaoPauloParts(now).dateISO : iso.slice(0, 10);
+  if(inicioFixo17h&&getAgoraSaoPauloParts(now).totalMinutes<17*60)throw new Error('A hora extra das 17h só pode ser aberta a partir das 17h.');
+  const dataServico = getAgoraSaoPauloParts(now).dateISO;
   const inicioExtra = inicioFixo17h ? new Date(`${dataServico}T17:00:00-03:00`).toISOString() : iso;
   const tx = db.transaction(() => {
     // A mesma OS pode ter vários mecânicos; o bloqueio é por colaborador.
@@ -1438,7 +1446,7 @@ function registrarInicioHoraExtra(dados, inicioFixo17h = false) {
     const info = db.prepare(`INSERT INTO escala_horas_extras (user_id,colaborador_id,os_id,equipamento_id,data_servico,inicio_extra,inicio_fixo_17h,descricao_servico,foto_inicio_path,latitude_inicio,longitude_inicio,precisao_inicio,status,criado_em,atualizado_em)
       VALUES (@user_id,@colaborador_id,@os_id,@equipamento_id,@data_servico,@inicio_extra,@inicio_fixo_17h,@descricao_servico,@foto_inicio_path,@latitude_inicio,@longitude_inicio,@precisao_inicio,'EM_ANDAMENTO',datetime('now'),datetime('now'))`).run({
       user_id: dados.user_id || null, colaborador_id: colaboradorId, os_id: osId, equipamento_id: os?.equipamento_id || null, data_servico: dataServico, inicio_extra: inicioExtra, inicio_fixo_17h: inicioFixo17h ? 1 : 0, descricao_servico: descricao, foto_inicio_path: dados.foto_inicio_path || null,
-      latitude_inicio: dados.latitude_inicio || null, longitude_inicio: dados.longitude_inicio || null, precisao_inicio: dados.precisao_inicio || null,
+      latitude_inicio: geo.latitude, longitude_inicio: geo.longitude, precisao_inicio: geo.precisao,
     });
     return info.lastInsertRowid;
   });
@@ -1465,9 +1473,10 @@ Object.assign(module.exports, { iniciarHoraExtraDesde17, canIniciarHoraExtraDesd
 function finalizarHoraExtra(id, dados) {
   const he = getHoraExtra(id); if (!he) throw new Error('Registro não encontrado.');
   if (he.status !== 'EM_ANDAMENTO') throw new Error('Somente horas extras em andamento podem ser finalizadas.');
+  const geo=exigirLocalizacao(dados,'fim');
   const fim = new Date(); const inicio = new Date(he.inicio_extra); const minutos = Math.round((fim - inicio)/60000);
   if (minutos <= 0) throw new Error('Total de minutos precisa ser maior que zero.');
-  db.prepare(`UPDATE escala_horas_extras SET fim_extra=?, total_minutos=?, foto_fim_path=?, latitude_fim=?, longitude_fim=?, precisao_fim=?, status='PENDENTE_APROVACAO', atualizado_em=datetime('now') WHERE id=?`).run(fim.toISOString(), minutos, dados.foto_fim_path || null, dados.latitude_fim || null, dados.longitude_fim || null, dados.precisao_fim || null, id);
+  db.prepare(`UPDATE escala_horas_extras SET fim_extra=?, total_minutos=?, foto_fim_path=?, latitude_fim=?, longitude_fim=?, precisao_fim=?, status='PENDENTE_APROVACAO', atualizado_em=datetime('now') WHERE id=? AND status='EM_ANDAMENTO'`).run(fim.toISOString(), minutos, dados.foto_fim_path || null, geo.latitude, geo.longitude, geo.precisao, id);
 }
 
 function listarHorasExtrasPendentes() { return listarHorasExtras({ status: 'PENDENTE_APROVACAO' }); }
@@ -1482,7 +1491,7 @@ function listarHorasExtras(filtros={}) {
   if (filtros.inicio) { where += ' AND he.data_servico>=?'; params.push(filtros.inicio); }
   if (filtros.fim) { where += ' AND he.data_servico<=?'; params.push(filtros.fim); }
   return db.prepare(`SELECT he.*, c.nome AS colaborador_nome, o.equipamento AS os_equipamento, o.descricao AS os_descricao, e.nome AS equipamento_nome, u.name AS aprovado_por_nome, autor.name AS registrado_por_nome
-    FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id LEFT JOIN os o ON o.id=he.os_id LEFT JOIN equipamentos e ON e.id=he.equipamento_id LEFT JOIN users u ON u.id=he.aprovado_por LEFT JOIN users autor ON autor.id=he.user_id
+    FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id AND ${visibilidadeEscala()} LEFT JOIN os o ON o.id=he.os_id LEFT JOIN equipamentos e ON e.id=he.equipamento_id LEFT JOIN users u ON u.id=he.aprovado_por LEFT JOIN users autor ON autor.id=he.user_id
     WHERE ${where} ORDER BY he.data_servico DESC, he.id DESC ${filtros.semLimite ? '' : 'LIMIT 500'}`).all(...params);
 }
 
@@ -1584,11 +1593,12 @@ function aprovarHoraExtra(id, usuarioAprovador, observacao) {
   }); tx();
 }
 
-function reprovarHoraExtra(id, usuarioResponsavel, motivo) { if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if (!String(motivo||'').trim()) throw new Error('Motivo da reprovação obrigatório.'); db.prepare("UPDATE escala_horas_extras SET status='REPROVADO', motivo_reprovacao=?, aprovado_por=?, aprovado_em=datetime('now'), atualizado_em=datetime('now') WHERE id=? AND status='PENDENTE_APROVACAO'").run(String(motivo).trim(), userIdFrom(usuarioResponsavel), id); }
-function cancelarHoraExtra(id, usuarioResponsavel, motivo) { if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if (!String(motivo||'').trim()) throw new Error('Motivo do cancelamento obrigatório.'); db.prepare("UPDATE escala_horas_extras SET status='CANCELADO', motivo_cancelamento=?, atualizado_em=datetime('now') WHERE id=? AND status<>'APROVADO'").run(String(motivo).trim(), id); }
+function reprovarHoraExtra(id, usuarioResponsavel, motivo) { if (!getHoraExtra(id)) throw new Error('Registro não encontrado.'); if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if (!String(motivo||'').trim()) throw new Error('Motivo da reprovação obrigatório.'); db.prepare("UPDATE escala_horas_extras SET status='REPROVADO', motivo_reprovacao=?, aprovado_por=?, aprovado_em=datetime('now'), atualizado_em=datetime('now') WHERE id=? AND status='PENDENTE_APROVACAO'").run(String(motivo).trim(), userIdFrom(usuarioResponsavel), id); }
+function cancelarHoraExtra(id, usuarioResponsavel, motivo) { if (!getHoraExtra(id)) throw new Error('Registro não encontrado.'); if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if (!String(motivo||'').trim()) throw new Error('Motivo do cancelamento obrigatório.'); db.prepare("UPDATE escala_horas_extras SET status='CANCELADO', motivo_cancelamento=?, atualizado_em=datetime('now') WHERE id=? AND status<>'APROVADO'").run(String(motivo).trim(), id); }
 function ajustarHoraExtra(id, dados, usuarioResponsavel) { if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); const just=String(dados.justificativa||dados.observacao||'').trim(); if (!just) throw new Error('Justificativa obrigatória.'); const he=getHoraExtra(id); if(!he) throw new Error('Registro não encontrado.'); const inicio=dados.inicio_extra?new Date(dados.inicio_extra):new Date(he.inicio_extra); const fim=dados.fim_extra?new Date(dados.fim_extra):new Date(he.fim_extra||new Date()); const minutos=Math.round((fim-inicio)/60000); if(minutos<=0) throw new Error('Fim não pode ser menor que início.'); db.prepare('UPDATE escala_horas_extras SET inicio_extra=?, fim_extra=?, total_minutos=?, observacao_aprovacao=?, atualizado_em=datetime(\'now\') WHERE id=?').run(inicio.toISOString(), fim.toISOString(), minutos, just, id); if(he.status==='APROVADO'){ const diff=minutos-Number(he.total_minutos||0); if(diff) db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,hora_extra_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(he.user_id, he.colaborador_id, id, diff>0?'AJUSTE_CREDITO':'AJUSTE_DEBITO', Math.abs(diff), `Ajuste de hora extra: ${just}`, userIdFrom(usuarioResponsavel)); } }
 
 function calcularSaldoBancoHoras(colaboradorId) {
+  if (!retencao.disponivel(db, colaboradorId)) return { creditos: 0, debitos: 0, ...saldoResumo(0) };
   if (!tableExists('escala_banco_horas_movimentos')) return { creditos: 0, debitos: 0, ...saldoResumo(0) };
   const rows = db.prepare(`SELECT tipo, SUM(minutos) AS total FROM escala_banco_horas_movimentos WHERE colaborador_id=? GROUP BY tipo`).all(colaboradorId);
   let creditos=0, debitos=0; rows.forEach(r=>{ if(['CREDITO_HORA_EXTRA','AJUSTE_CREDITO'].includes(r.tipo)) creditos+=Number(r.total||0); else debitos+=Number(r.total||0); });
@@ -1607,7 +1617,7 @@ function listarBancoHoras(filtros = {}) {
       return { ...c, funcaoLabel: funcaoLabel(normalizeFuncao(c.funcao)), saldo: calcularSaldoBancoHoras(c.id), horasExtrasMesMinutos, folgasCompensadasMinutos, ausenciasJustificadas: 0, ultimasHorasExtras: extras.slice(0,3), ultimasFolgas: folgas.slice(0,3) };
     });
 }
-function listarMovimentosBancoHoras(colaboradorId) { return db.prepare('SELECT * FROM escala_banco_horas_movimentos WHERE colaborador_id=? ORDER BY data_movimento DESC, id DESC').all(colaboradorId); }
+function listarMovimentosBancoHoras(colaboradorId) { if (!retencao.disponivel(db,colaboradorId)) return []; return db.prepare('SELECT * FROM escala_banco_horas_movimentos WHERE colaborador_id=? ORDER BY data_movimento DESC, id DESC').all(colaboradorId); }
 const TIPOS_FOLGA = new Set(['FOLGA_COMPENSATORIA','FOLGA_MANUAL','ATESTADO','FERIAS','FALTA_JUSTIFICADA','FALTA_NAO_JUSTIFICADA','OUTRO']);
 function normalizarTipoFolga(value) {
   const tipo = String(value || 'FOLGA_COMPENSATORIA').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/-]+/g,'_');
@@ -1622,7 +1632,7 @@ function listarFolgas(filtros={}) {
   if(filtros.tipo_ausencia){where+=' AND f.tipo_lancamento=?';params.push(normalizarTipoFolga(filtros.tipo_ausencia))}
   if(filtros.status){where+=' AND f.status=?';params.push(filtros.status)}
   if(filtros.equipamento){where+=' AND lower(COALESCE(f.equipamento,\'\')) LIKE ?';params.push(`%${String(filtros.equipamento).toLowerCase()}%`)}
-  return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params);
+  return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id AND ${visibilidadeEscala()} LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params);
 }
 function programarFolgaCompensatoria(dados) {
   const col=Number(dados.colaborador_id); const tipo=normalizarTipoFolga(dados.tipo_lancamento||dados.tipo);
@@ -1670,7 +1680,7 @@ function parseIds(value) {
 function addDaysISO(dateISO, days) { const d = new Date(`${dateISO}T00:00:00Z`); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10); }
 function colaboradorDisponivelNoPeriodo(colaboradorId, inicio, fim) {
   const c = db.prepare(`SELECT * FROM colaboradores WHERE id=?`).get(colaboradorId);
-  if (!c || !isColaboradorAtivo(c) || isColaboradorDemo(c) || Number(c.fora_escala || 0) === 1) return false;
+  if (!c || !retencao.disponivel(db,colaboradorId) || !isColaboradorAtivo(c) || isColaboradorDemo(c) || Number(c.fora_escala || 0) === 1) return false;
   return buscarIndisponibilidadesNoPeriodo(colaboradorId, inicio, fim).length === 0;
 }
 function buscarIndisponibilidadesNoPeriodo(colaboradorId, inicio, fim) {
@@ -1690,9 +1700,9 @@ function buscarRodizioAtivo() {
   if (!cfg) return null;
   cfg.modo_noturno = String(cfg.modo_noturno || 'individual').toLowerCase() === 'dupla' ? 'dupla' : 'individual';
   cfg.plantonistas_por_semana = cfg.modo_noturno === 'dupla' ? 2 : 1;
-  cfg.noturnos = db.prepare(`SELECT i.*, COALESCE(i.ordem_noturno,1) AS ordem_noturno, c.nome FROM escala_rodizio_itens i JOIN colaboradores c ON c.id=i.colaborador_id WHERE i.config_id=? AND i.ativo=1 AND UPPER(i.turno)='NOITE' ORDER BY i.posicao, COALESCE(i.ordem_noturno,1), i.id`).all(cfg.id);
+  cfg.noturnos = db.prepare(`SELECT i.*, COALESCE(i.ordem_noturno,1) AS ordem_noturno, c.nome FROM escala_rodizio_itens i JOIN colaboradores c ON c.id=i.colaborador_id AND ${visibilidadeEscala()} WHERE i.config_id=? AND i.ativo=1 AND UPPER(i.turno)='NOITE' ORDER BY i.posicao, COALESCE(i.ordem_noturno,1), i.id`).all(cfg.id);
   cfg.semanas = agruparNoturnosPorSemana(cfg.noturnos, Number(cfg.tamanho_ciclo || 1));
-  cfg.diurnosFixos = db.prepare(`SELECT f.*, c.nome FROM escala_diurno_fixos f JOIN colaboradores c ON c.id=f.colaborador_id WHERE f.config_id=? AND f.ativo=1 ORDER BY c.nome`).all(cfg.id);
+  cfg.diurnosFixos = db.prepare(`SELECT f.*, c.nome FROM escala_diurno_fixos f JOIN colaboradores c ON c.id=f.colaborador_id AND ${visibilidadeEscala()} WHERE f.config_id=? AND f.ativo=1 ORDER BY c.nome`).all(cfg.id);
   return cfg;
 }
 
@@ -1869,7 +1879,7 @@ function sincronizarFolgaSabado(semana, usuario, { sobrescrever = false } = {}) 
   const folga = colaboradorEscalaPorNome(duplaRetorno[ocorrencia % 2]);
   const parceiro = colaboradorEscalaPorNome(duplaRetorno[(ocorrencia + 1) % 2]);
   const diogo = colaboradorEscalaPorNome('Diogo');
-  if (!folga || !parceiro || !diogo) throw new Error('Diogo e os quatro colaboradores do revezamento devem estar ativos.');
+  if (!folga || !parceiro || !diogo) return null;
   db.prepare(`INSERT INTO escala_folgas_sabado (semana_id,data_sexta,colaborador_folga_id,motivo_folga,data_sabado,colaborador_fixo_id,parceiro_diogo_id,responsavel_id)
     VALUES (?,? ,?,'PLANTAO_NOTURNO',?,?,?,?) ON CONFLICT(semana_id) DO UPDATE SET data_sexta=excluded.data_sexta,colaborador_folga_id=excluded.colaborador_folga_id,motivo_folga='PLANTAO_NOTURNO',data_sabado=excluded.data_sabado,colaborador_fixo_id=excluded.colaborador_fixo_id,parceiro_diogo_id=excluded.parceiro_diogo_id,responsavel_id=excluded.responsavel_id,substituto_diogo_id=NULL,atualizado_em=datetime('now')`).run(semana.id,addDaysISO(semana.data_inicio,4),folga.id,addDaysISO(semana.data_inicio,5),diogo.id,parceiro.id,userIdFrom(usuario));
   return db.prepare(`SELECT * FROM escala_folgas_sabado WHERE semana_id=?`).get(semana.id);
@@ -1883,7 +1893,7 @@ function sincronizarAdicionalNoturno(semana, usuario) {
 function listarFolgasSabado({ inicio, fim } = {}) {
   if (!tableExists('escala_folgas_sabado')) return [];
   return db.prepare(`SELECT fs.*,s.semana_numero,s.data_inicio,s.data_fim,cf.nome AS colaborador_folga,fixo.nome AS colaborador_fixo,parceiro.nome AS parceiro_diogo,sub.nome AS substituto_diogo,COALESCE(u.name,'Sistema') AS responsavel
-    FROM escala_folgas_sabado fs JOIN escala_semanas s ON s.id=fs.semana_id JOIN colaboradores cf ON cf.id=fs.colaborador_folga_id LEFT JOIN colaboradores fixo ON fixo.id=fs.colaborador_fixo_id JOIN colaboradores parceiro ON parceiro.id=fs.parceiro_diogo_id LEFT JOIN colaboradores sub ON sub.id=fs.substituto_diogo_id LEFT JOIN users u ON u.id=fs.responsavel_id
+    FROM escala_folgas_sabado fs JOIN escala_semanas s ON s.id=fs.semana_id JOIN colaboradores cf ON cf.id=fs.colaborador_folga_id AND ${visibilidadeEscala("cf")} LEFT JOIN colaboradores fixo ON fixo.id=fs.colaborador_fixo_id AND ${visibilidadeEscala("fixo")} JOIN colaboradores parceiro ON parceiro.id=fs.parceiro_diogo_id AND ${visibilidadeEscala("parceiro")} LEFT JOIN colaboradores sub ON sub.id=fs.substituto_diogo_id AND ${visibilidadeEscala("sub")} LEFT JOIN users u ON u.id=fs.responsavel_id
     WHERE (? IS NULL OR s.data_fim>=?) AND (? IS NULL OR s.data_inicio<=?) ORDER BY s.data_inicio`).all(inicio||null,inicio||null,fim||null,fim||null);
 }
 function salvarFolgaSabadoManual(semanaId, dados, usuario) {
@@ -1953,3 +1963,5 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
 }
 
 Object.assign(module.exports, { listarFolgasSabado, salvarFolgaSabadoManual, sincronizarFolgaSabado, sincronizarAdicionalNoturno, MOTIVOS_FOLGA_SABADO, listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, MINUTOS_MEIO_PERIODO_FOLGA, MINUTOS_MINIMOS_MEIO_PERIODO, minutosToHoras, saldoResumo, saldoPermiteDebitoFolga, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, listarHorasExtrasParaCompensacao, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+
+Object.assign(module.exports, { excluirColaboradorDaEscala: (id,usuario) => retencao.excluir(db,id,usuario), purgarRegistrosExpirados: (opcoes) => retencao.purgarVencidos(db,opcoes) });

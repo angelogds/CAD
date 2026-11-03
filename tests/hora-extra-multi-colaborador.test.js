@@ -71,7 +71,7 @@ test('banco permite vários mecânicos ativos na mesma OS e bloqueia só duplici
 test('telas exibem contador individual e totais separados por colaborador na OS', () => {
   assert.match(controller, /listarHorasExtrasEmAndamentoPorOs\(osSelecionadaId\)/);
   assert.match(horaExtraView, /js-extra-clock/);
-  assert.match(horaExtraView, /não bloqueia outros mecânicos/);
+  assert.match(horaExtraView, /data-start=/);
   assert.match(osView, /Total geral da OS/);
   assert.match(osView, /Total por colaborador/);
 });

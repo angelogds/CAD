@@ -1,5 +1,6 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
   const lista = semanas || [];
   const manuais = lista.filter(s => Number(s.ajuste_manual || 0) === 1).length;
@@ -10,14 +11,7 @@
     <div class="escala-actions"><a class="btn" href="/escala/folgas-sabado">Folgas e Plantão de Sábado</a><a class="btn" href="/escala">← Voltar</a></div>
   </header>
 
-  <nav class="escala-tabs">
-    <a class="escala-tab" href="/escala">Painel da Equipe</a>
-    <a class="escala-tab" href="/escala/semana">Escala da Semana</a>
-    <a class="escala-tab is-active" href="/escala/completa">Escala Completa</a>
-    <a class="escala-tab" href="/escala/ausencias">Folgas / Afastamentos</a>
-    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
-    <a class="escala-tab" href="/escala/relatorios">Relatórios</a>
-  </nav>
+  <%- include('_tabs',{escalaTab:'escalas'}) %>
 
   <section class="escala-kpis">
     <div class="escala-kpi"><span>Semanas listadas</span><strong><%= lista.length %></strong><small>No período selecionado</small></div>

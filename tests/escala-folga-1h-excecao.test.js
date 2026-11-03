@@ -36,6 +36,7 @@ function fixture({ saldo = 480, programada = null, pendente = null, registro = n
     transaction(fn) { return fn; },
   };
   const dependencies = {
+    './escala.retencao.service': require('../modules/escala/escala.retencao.service'),
     '../../database/db': database,
     './escala.service': {
       buscarColaboradorDoUsuario: () => ({ id: 7 }),

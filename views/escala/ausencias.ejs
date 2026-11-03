@@ -1,13 +1,13 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
   const lista = ausencias || [];
   const statusClass = (tipo) => { const s=String(tipo||'').toUpperCase(); if(s.includes('FERI')) return 'is-ferias'; if(s.includes('ATEST')) return 'is-atestado'; if(s.includes('FOLGA')) return 'is-folga'; return 'is-ausente'; };
 %>
 <div class="escala-page">
   <header class="escala-head"><div><h1>Folgas, Atestados e Férias</h1><p>Indisponibilidades que afetam a composição operacional da equipe.</p></div><div class="escala-actions"><form method="GET" action="/escala/ausencias" style="display:flex;gap:6px"><input type="date" name="date" value="<%= alvo %>" class="input"><button class="btn" type="submit">Filtrar data</button></form><a class="btn" href="/escala">← Voltar</a></div></header>
-  <div class="escala-notice">Férias, atestados e folgas devem impedir a pessoa de aparecer como disponível no mesmo período. O registro aqui não representa automaticamente crédito ou débito no Banco de Horas, salvo quando o fluxo específico de folga compensatória determinar isso.</div>
-  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/completa">Escalas</a><a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a><a class="escala-tab" href="/escala/hora-extra/pendentes">Horas Extras</a><a class="escala-tab is-active" href="/escala/ausencias">Ausências</a></nav>
+  <%- include('_tabs',{escalaTab:'ausencias'}) %>
   <section class="escala-kpis"><div class="escala-kpi"><span>Registros</span><strong><%= lista.length %></strong><small>No recorte consultado</small></div><div class="escala-kpi"><span>Folgas</span><strong><%= lista.filter(a=>String(a.tipo||'').includes('FOLGA')).length %></strong><small>Folgas e meio período</small></div><div class="escala-kpi"><span>Atestados</span><strong><%= lista.filter(a=>String(a.tipo||'').includes('ATESTADO')).length %></strong><small>Afastamento informado</small></div><div class="escala-kpi"><span>Férias</span><strong><%= lista.filter(a=>String(a.tipo||'').includes('FERIAS')).length %></strong><small>Períodos de férias</small></div></section>
   <section class="escala-section"><div class="escala-section-head"><div><h2>Registros de indisponibilidade</h2><div class="muted">Visualize e ajuste os períodos antes de gerar os relatórios.</div></div></div><div class="escala-team-grid">
     <% if(!lista.length){ %><div class="escala-audit-note">Nenhum registro encontrado para a data selecionada.</div><% } %>

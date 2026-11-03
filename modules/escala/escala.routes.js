@@ -77,12 +77,13 @@ function redirectRoleDashboard(req, res, next) {
 
 function requireHoraExtraDesde17Access(req, res, next) {
   if (canIniciarHoraExtraDesde17(req.session?.user || {})) return next();
-  const message = 'Apenas encarregado de manutenção, supervisor de manutenção ou administrador podem abrir hora extra desde as 17h.';
+  const message = 'Apenas encarregado de manutenção ou administrador podem abrir hora extra desde as 17h.';
   if (req.accepts('html')) return res.status(403).render('errors/403', { layout: 'layout', title: 'Sem permissão', message });
   return res.status(403).json({ error: message });
 }
 
 router.get("/", requireLogin, requireRole(escalaRead), redirectRoleDashboard, safe(controller.index, "index"));
+router.post("/colaboradores/:id/excluir", requireLogin, requireRole(escalaManage), safe(controller.excluirColaborador, "excluirColaborador"));
 router.get("/meu-painel", requireLogin, requireRole(maintenanceSelfRead), safe(selfController.index, "selfIndex"));
 // Compatibilidade: a antiga entrada /escala/rh não renderiza mais uma tela própria.
 router.get("/rh", requireLogin, requireRole(escalaRhRead), (_req, res) => res.redirect(301, "/rh"));

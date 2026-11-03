@@ -32,13 +32,14 @@ test('views operacionais da Escala usam a linguagem visual compartilhada', () =>
     'views/escala/nova.ejs',
     'views/escala/folgas-sabado.ejs',
     'views/escala/rodizio.ejs',
+    'views/escala/rodizio-preview.ejs',
   ];
 
   for (const file of arquivos) {
     const source = read(file);
     assert.match(source, /class="escala-page"/, `${file} deve usar escala-page`);
     assert.match(source, /class="escala-head"/, `${file} deve usar escala-head`);
-    assert.match(source, /class="escala-tabs"/, `${file} deve usar navegação padronizada`);
+    assert.match(source, /include\('_tabs'/, `${file} deve usar navegação padronizada`);
   }
 
   assert.match(read('views/escala/semana.ejs'), /Equipe programada/);
@@ -55,12 +56,12 @@ test('hora extra mantém o mecânico preso ao próprio perfil e exige justificat
   const controller = read('modules/escala/escala.controller.js');
 
   assert.match(view, /canManageEscala\s*&&\s*listaColaboradores\.length\s*>\s*1/);
-  assert.match(view, /Perfil fixo/);
-  assert.match(view, /name="colaborador_id"\s+value="<%= colaborador\.id %>"/);
+  assert.match(view, /escala-identity/);
+  assert.match(view, /name="colaborador_id"\s+value="<%=\s*colaborador\.id\s*%>"/);
   assert.match(view, /id="horaExtraOs"/);
   assert.match(view, /id="horaExtraDescricao"/);
-  assert.match(view, /descricao\.required\s*=\s*semOs/);
-  assert.match(view, /Sem OS — justificar abaixo/);
+  assert.match(read('public/js/escala-localizacao.js'), /descricao.required=!os\?\.value/);
+  assert.match(view, /Obrigatório quando não houver OS/);
 
   assert.match(controller, /buscarColaboradorDoUsuario\(user\.id\)/);
   assert.match(controller, /colaboradores\.filter\(\(c\)\s*=>\s*Number\(c\.id\)\s*===\s*Number\(vinculado\.id\)\)/);
@@ -75,8 +76,8 @@ test('fluxos existentes continuam preservados nas views modernizadas', () => {
   const sabado = read('views/escala/folgas-sabado.ejs');
   const rodizio = read('views/escala/rodizio.ejs');
 
-  assert.match(extra, /action="\/escala\/hora-extra\/iniciar"/);
-  assert.match(extra, /action="\/escala\/hora-extra\/<%= emAndamento\.id %>\/finalizar"/);
+  assert.match(extra, /\/escala\/hora-extra\/iniciar/);
+  assert.match(extra, /action="\/escala\/hora-extra\/<%=\s*emAndamento\.id\s*%>\/finalizar"/);
   assert.match(extra, /name="foto_inicio"/);
   assert.match(extra, /name="foto_fim"/);
   assert.match(extra, /name="latitude_inicio"/);

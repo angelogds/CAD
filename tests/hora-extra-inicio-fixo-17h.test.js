@@ -8,7 +8,8 @@ const { DatabaseSync } = require('node:sqlite');
 
 const root = path.join(__dirname, '..');
 const gestor = { id: 91, role: 'ENCARREGADO_MANUTENCAO' };
-const dadosServico = { colaborador_id: 1, descricao_servico: 'Manutenção do transportador' };
+const gps = { latitude_inicio: -12.2, longitude_inicio: -39, precisao_inicio: 9, latitude_fim: -12.2, longitude_fim: -39, precisao_fim: 12 };
+const dadosServico = { ...gps, colaborador_id: 1, descricao_servico: 'Manutenção do transportador' };
 const migrateInicioFixo = require('../database/migrations/228_escala_hora_extra_inicio_fixo_17h');
 
 function applyMigration(sqlite) {
@@ -144,15 +145,18 @@ test('campos forjados no formulário não escolhem início, data, criação ou a
   assert.equal(row.inicio_fixo_17h, 1);
 });
 
-test('abertura antecipada aguarda 17h e fechamento usa o relógio real', t => {
+test('abertura antes das 17h é bloqueada; depois das 17h usa relógio real', t => {
   const f = fixture(t, '2026-10-21T18:00:00.000Z');
+  assert.throws(() => f.service.iniciarHoraExtraDesde17(dadosServico, gestor), /a partir das 17h/);
+  assert.equal(f.count(), 0);
+  f.setClock('2026-10-21T20:00:00.000Z');
   const id = f.service.iniciarHoraExtraDesde17(dadosServico, gestor);
   assert.equal(f.row(id).inicio_extra, '2026-10-21T20:00:00.000Z');
-  assert.throws(() => f.service.finalizarHoraExtra(id, {}), /17|maior que zero|início/i);
+  assert.throws(() => f.service.finalizarHoraExtra(id, gps), /17|maior que zero|início/i);
   assert.equal(f.row(id).status, 'EM_ANDAMENTO');
   assert.equal(f.row(id).fim_extra, null);
   f.setClock('2026-10-21T21:31:00.000Z');
-  f.service.finalizarHoraExtra(id, { fim_extra: '2026-10-22T01:00:00.000Z', total_minutos: 999 });
+  f.service.finalizarHoraExtra(id, { ...gps, fim_extra: '2026-10-22T01:00:00.000Z', total_minutos: 999 });
   assert.equal(f.row(id).fim_extra, '2026-10-21T21:31:00.000Z');
   assert.equal(f.row(id).total_minutos, 91);
   assert.equal(f.row(id).status, 'PENDENTE_APROVACAO');
@@ -162,7 +166,7 @@ test('fechamento depois da meia-noite mantém a data e o início originais', t =
   const f = fixture(t);
   const id = f.service.iniciarHoraExtraDesde17(dadosServico, gestor);
   f.setClock('2026-10-22T03:30:00.000Z');
-  f.service.finalizarHoraExtra(id, {});
+  f.service.finalizarHoraExtra(id, gps);
   assert.equal(f.row(id).data_servico, '2026-10-21');
   assert.equal(f.row(id).inicio_extra, '2026-10-21T20:00:00.000Z');
   assert.equal(f.row(id).fim_extra, '2026-10-22T03:30:00.000Z');
@@ -172,10 +176,10 @@ test('fechamento depois da meia-noite mantém a data e o início originais', t =
 test('somente administrador e lideranças de manutenção autorizam início fixo', t => {
   const f = fixture(t);
   for (const role of [
-    'ADMIN', 'ENCARREGADO_MANUTENCAO', 'SUPERVISOR_MANUTENCAO', 'MANUTENCAO_SUPERVISOR',
+    'ADMIN', 'ENCARREGADO_MANUTENCAO',
     'Administrador', 'Encarregado de Manutenção', 'ENCARREGADO',
   ]) assert.equal(f.service.canIniciarHoraExtraDesde17({ role }), true, role);
-  for (const role of ['MECANICO', 'RH', 'DIRETORIA', 'PRODUCAO', 'MANUTENCAO', 'COLABORADOR', '']) {
+  for (const role of ['SUPERVISOR_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'MECANICO', 'RH', 'DIRETORIA', 'PRODUCAO', 'MANUTENCAO', 'COLABORADOR', '']) {
     assert.equal(f.service.canIniciarHoraExtraDesde17({ role }), false, role);
     assert.throws(() => f.service.iniciarHoraExtraDesde17(dadosServico, { id: 12, role }), /permiss|autoriz|apenas/i, role);
   }
@@ -220,8 +224,8 @@ test('cancelamentos, reprovações e intervalos encerrados às 17h não bloqueia
 test('validações de colaborador e serviço continuam obrigatórias', t => {
   const f = fixture(t);
   assert.throws(() => f.service.iniciarHoraExtraDesde17({ descricao_servico: 'Serviço' }, gestor), /Colaborador|mecânico/i);
-  assert.throws(() => f.service.iniciarHoraExtraDesde17({ colaborador_id: 1 }, gestor), /OS|descreva/i);
-  assert.throws(() => f.service.iniciarHoraExtraDesde17({ colaborador_id: 1, os_id: 999 }, gestor), /OS/i);
+  assert.throws(() => f.service.iniciarHoraExtraDesde17({ ...gps, colaborador_id: 1 }, gestor), /OS|descreva/i);
+  assert.throws(() => f.service.iniciarHoraExtraDesde17({ ...gps, colaborador_id: 1, os_id: 999 }, gestor), /OS/i);
   assert.equal(f.count(), 0);
 });
 
@@ -282,7 +286,7 @@ function response() {
   };
 }
 
-function request(user = gestor, body = {}) {
+function request(user = gestor, body = gps) {
   const messages = [];
   return { session: { user }, body, query: {}, accepts: () => false, flash: (type, message) => messages.push({ type, message }), messages };
 }
@@ -374,7 +378,7 @@ test('aprovação credita no banco do colaborador o período inteiro desde 17h',
   const f = fixture(t);
   const id = f.service.iniciarHoraExtraDesde17(dadosServico, gestor);
   f.setClock('2026-10-21T21:31:00.000Z');
-  f.service.finalizarHoraExtra(id, {});
+  f.service.finalizarHoraExtra(id, gps);
   f.service.aprovarHoraExtra(id, gestor, 'Serviço concluído');
   const movement = f.sqlite.prepare('SELECT * FROM escala_banco_horas_movimentos WHERE hora_extra_id=?').get(id);
   assert.equal(movement.colaborador_id, 1);
@@ -417,7 +421,7 @@ test('GET e POST novos exigem autenticação e gestão antes de processar upload
     const route = routes.find(item => item.method === method && item.url === url);
     assert.ok(route, `${method} ${url}`);
     assert.equal(route.handlers[0], requireLogin);
-    for (const role of ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'SUPERVISOR_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'MECANICO', 'RH', 'DIRETORIA', 'MANUTENCAO', null]) {
+    for (const role of ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'MECANICO', 'RH', 'DIRETORIA', 'MANUTENCAO', null]) {
       const req = request(role ? { id: 12, role } : null);
       const res = response();
       let cursor = 0;
@@ -457,7 +461,7 @@ function executeRoute(route, req, res) {
 }
 
 for (const role of [
-  'ADMIN', 'ENCARREGADO_MANUTENCAO', 'SUPERVISOR_MANUTENCAO', 'MANUTENCAO_SUPERVISOR',
+  'ADMIN', 'ENCARREGADO_MANUTENCAO',
   'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_DE_MANUTENCAO',
 ]) {
   test(`POST comum permite a ${role} escolher FIXO_17H para o colaborador selecionado`, t => {
@@ -514,7 +518,7 @@ for (const modo of ['AGORA', undefined]) {
   });
 }
 
-test('mecânico não pode forjar FIXO_17H no POST comum nem criar lançamento', t => {
+for (const role of ['MECANICO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO']) test(`${role} não pode forjar FIXO_17H no POST comum nem criar lançamento`, t => {
   const f = fixture(t);
   const service = {
     ...f.service,
@@ -522,7 +526,7 @@ test('mecânico não pode forjar FIXO_17H no POST comum nem criar lançamento', 
     iniciarHoraExtraDesde17() { assert.fail('Pedido de início fixo não autorizado não pode chegar ao serviço'); },
   };
   const { routes } = loadRoutes(service, loadController(service));
-  const req = request({ id: 12, role: 'MECANICO' }, { ...dadosServico, modo_inicio: 'FIXO_17H' });
+  const req = request({ id: 12, role }, { ...dadosServico, modo_inicio: 'FIXO_17H' });
   const res = response();
   executeRoute(routes.find(route => route.method === 'POST' && route.url === '/hora-extra/iniciar'), req, res);
   assert.equal(res.statusCode, 403);
@@ -533,10 +537,10 @@ test('mecânico não pode forjar FIXO_17H no POST comum nem criar lançamento', 
 function renderHoraExtra(data) {
   const ejs = require('ejs');
   const view = fs.readFileSync(path.join(root, 'views/escala/hora-extra-nova.ejs'), 'utf8');
-  return ejs.render(view, { layout: () => '', dateBr: require('../utils/data-hora-br'), ...data });
+  return ejs.render(view, { filename: path.join(root,'views/escala/hora-extra-nova.ejs'), layout: () => '', dateBr: require('../utils/data-hora-br'), ...data });
 }
 
-for (const role of ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'SUPERVISOR_MANUTENCAO', 'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_DE_MANUTENCAO']) {
+for (const role of ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_DE_MANUTENCAO']) {
   test(`formulário comum de ${role} oferece AGORA e FIXO_17H antes de iniciar`, t => {
     const f = fixture(t);
     const res = response();
@@ -549,14 +553,9 @@ for (const role of ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'SUPERVISOR_MANUTENCAO', 
     const form = html.match(/<form\b[^>]*\bid="horaExtraForm"[^>]*>[\s\S]*?<\/form>/)?.[0];
     assert.ok(form, 'Formulário comum deve estar disponível para a gestão');
     assert.match(form, /action="\/escala\/hora-extra\/iniciar"/);
-    const radios = [...form.matchAll(/<input\b[^>]*>/g)].map(match => match[0]).filter(input => /\bname="modo_inicio"/.test(input));
-    assert.equal(radios.length, 2);
-    const agora = radios.find(input => /\bvalue="AGORA"/.test(input));
-    const fixo = radios.find(input => /\bvalue="FIXO_17H"/.test(input));
-    assert.ok(agora, 'Gestão deve poder abrir no horário real');
-    assert.ok(fixo, 'Gestão deve poder abrir com início às 17h');
-    assert.match(agora, /\bchecked(?:\s|>|=)/);
-    assert.doesNotMatch(fixo, /\bchecked(?:\s|>|=)/);
+    assert.match(form, /<select[^>]*name="modo_inicio"/);
+    assert.match(form, /<option value="AGORA">Agora<\/option>/);
+    assert.match(form, /<option value="FIXO_17H"/);
     assert.ok(form.indexOf('name="modo_inicio"') < form.indexOf('type="submit"'), 'A escolha deve aparecer antes do botão de iniciar');
     assert.match(form, /17h/);
     assert.doesNotMatch(form, /name="(?:inicio_extra|data_servico|criado_em|user_id)"/);
@@ -574,66 +573,11 @@ test('formulário do mecânico não oferece seletor de início fixo', t => {
   assert.doesNotMatch(html, /<select\b[^>]*\bname="colaborador_id"/);
 });
 
-test('JavaScript troca a explicação de início e envia FIXO_17H pela mesma action comum', async t => {
-  const f = fixture(t);
-  const res = response();
-  loadController(f.service).horaExtraNova(request(), res, assert.ifError);
-  const html = renderHoraExtra(res.data);
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-  assert.ok(script);
-  const element = (value = '') => ({
-    value, textContent: '', dataset: {}, listeners: {},
-    addEventListener(event, listener) { this.listeners[event] = listener; },
-  });
-  const agora = { ...element('AGORA'), checked: true };
-  const fixo = { ...element('FIXO_17H'), checked: false };
-  const escolhas = [agora, fixo];
-  const button = element();
-  const submissions = [];
-  const form = {
-    ...element(), action: '/escala/hora-extra/iniciar',
-    querySelector: selector => selector.includes(':checked') ? escolhas.find(item => item.checked) : selector === 'button[type="submit"]' ? button : null,
-    querySelectorAll: selector => selector === '[name="modo_inicio"]' ? escolhas : [],
-    setAttribute(name, value) { this[name] = value; },
-    submit() { submissions.push({ action: this.action, modo_inicio: escolhas.find(item => item.checked)?.value }); },
-  };
-  const elements = {
-    horaExtraForm: form,
-    horaExtraOs: element('145'),
-    horaExtraDescricao: element('Serviço na OS'),
-    horaExtraDescricaoAjuda: element(),
-    horaExtraInicioResumo: element(),
-    horaExtraInicioAviso: element(),
-    horaExtraLocalizacaoTitulo: element(),
-    horaExtraIniciarButton: button,
-  };
-  vm.runInNewContext(script, {
-    document: { getElementById: id => elements[id] || null, querySelector: () => null, querySelectorAll: () => [] },
-    navigator: {}, window: { confirm: () => true }, setInterval: () => {},
-  });
-  assert.match(elements.horaExtraInicioResumo.textContent, /horário real/);
-  agora.checked = false;
-  fixo.checked = true;
-  fixo.listeners.change();
-  assert.match(elements.horaExtraInicioResumo.textContent, /17h.*Brasília/);
-  assert.match(elements.horaExtraInicioResumo.textContent, /fechamento.*horário real/i);
-  assert.match(button.textContent, /17h/);
-  assert.match(elements.horaExtraLocalizacaoTitulo.textContent, /momento do lançamento/);
-  assert.match(elements.horaExtraInicioAviso.textContent, /foto.*GPS.*lançamento/);
-  assert.equal(form.action, '/escala/hora-extra/iniciar');
-  fixo.checked = false;
-  agora.checked = true;
-  agora.listeners.change();
-  assert.match(elements.horaExtraInicioResumo.textContent, /horário real/);
-  assert.equal(button.textContent, 'Iniciar Hora Extra');
-  agora.checked = false;
-  fixo.checked = true;
-  fixo.listeners.change();
-  let prevented = false;
-  form.listeners.submit({ preventDefault() { prevented = true; } });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(prevented, true);
-  assert.deepEqual(submissions, [{ action: '/escala/hora-extra/iniciar', modo_inicio: 'FIXO_17H' }]);
+test('formulário compacto usa captura obrigatória antes de enviar pela mesma action', () => {
+  const script = fs.readFileSync(path.join(root,'public/js/escala-localizacao.js'),'utf8');
+  assert.match(script, /const valid=await capture\(\)/);
+  assert.match(script, /if\(valid&&form.dataset.before17!=='1'\)form.submit\(\)/);
+  assert.match(script, /maximumAge:0/);
 });
 
 test('EJS renderiza início fixo, formulário correto e histórico do lançamento real', t => {
@@ -643,10 +587,13 @@ test('EJS renderiza início fixo, formulário correto e histórico do lançament
   controller.horaExtraDesde17(request(), res, assert.ifError);
   const ejs = require('ejs');
   const view = fs.readFileSync(path.join(root, 'views/escala/hora-extra-nova.ejs'), 'utf8');
-  const render = data => ejs.render(view, { layout: () => '', dateBr: require('../utils/data-hora-br'), ...data });
-  const html = render(res.data);
+  const render = data => ejs.render(view, { filename: path.join(root,'views/escala/hora-extra-nova.ejs'), layout: () => '', dateBr: require('../utils/data-hora-br'), ...data });
+  const html = render({ ...res.data, podeAbrir17Agora: true });
+  const antesDas17 = render({ ...res.data, podeAbrir17Agora: false });
+  assert.match(antesDas17, /data-before-17="1"/);
+  assert.match(antesDas17, /Disponível a partir das 17h/);
   assert.match(html, /action="\/escala\/hora-extra\/desde-17\/iniciar"/);
-  assert.match(html, /Início fixo às 17h de hoje/);
+  assert.match(html, /Início contado a partir das 17h de hoje/);
   assert.doesNotMatch(html, /name="(?:inicio_extra|data_servico|criado_em|user_id)"/);
   const semHoraExtra = response();
   controller.horaExtraNova(request({ id: 12, role: 'MECANICO' }), semHoraExtra, assert.ifError);
@@ -658,10 +605,9 @@ test('EJS renderiza início fixo, formulário correto e histórico do lançament
   controller.horaExtraDesde17(request(), andamento, assert.ifError);
   const activeHtml = render(andamento.data);
   assert.match(activeHtml, /data-start="2026-10-21T20:00:00.000Z"/);
-  assert.match(activeHtml, /21\/10\/2026 17:31/);
-  assert.match(activeHtml, /Responsável/);
+  assert.match(activeHtml, /Iniciada às 17:00/);
   assert.match(activeHtml, /action="\/escala\/hora-extra\/1\/finalizar"/);
-  assert.match(activeHtml, /Antes das 17h, o contador fica em zero/);
+  assert.match(activeHtml, /data-geo-context="fim"/);
   const comum = response();
   controller.horaExtraNova(request({ id: 12, role: 'MECANICO' }), comum, assert.ifError);
   assert.doesNotMatch(render(comum.data), /href="\/escala\/hora-extra\/desde-17"/);

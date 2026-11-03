@@ -1,243 +1,48 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/escala-dashboard.css?v=20261021-inicio-extra">
-<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
-  const listaColaboradores = Array.isArray(colaboradores) ? colaboradores : (colaborador ? [colaborador] : []);
-  const ativasOS = Array.isArray(horasExtrasAtivasOS) ? horasExtrasAtivasOS : [];
-  const listaHistorico = Array.isArray(historico) ? historico : [];
-  const listaOs = Array.isArray(osDisponiveis) ? osDisponiveis : [];
-  const inicioFixo17 = typeof modoInicioFixo17 !== 'undefined' && modoInicioFixo17;
-  const acessoInicioFixo17 = typeof podeInicioFixo17 !== 'undefined' && podeInicioFixo17;
-  const caminhoFormulario = inicioFixo17 ? '/escala/hora-extra/desde-17' : '/escala/hora-extra/nova';
-  const fmtMin = (value) => { const n=Math.max(0,Number(value||0)); return `${Math.floor(n/60)}h${String(n%60).padStart(2,'0')}`; };
+const listaColaboradores=Array.isArray(colaboradores)?colaboradores:(colaborador?[colaborador]:[]);
+const listaOs=Array.isArray(osDisponiveis)?osDisponiveis:[];
+const listaHistorico=Array.isArray(historico)?historico:[];
+const inicioFixo17=typeof modoInicioFixo17!=='undefined'&&modoInicioFixo17;
+const acessoInicioFixo17=typeof podeInicioFixo17!=='undefined'&&podeInicioFixo17;
+const liberado17=typeof podeAbrir17Agora==='undefined'?true:podeAbrir17Agora;
+const caminhoFormulario=inicioFixo17?'/escala/hora-extra/desde-17':'/escala/hora-extra/nova';
+const fmtMin=v=>{const n=Math.max(0,Number(v)||0);return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');};
 %>
-<div class="escala-page">
-  <div class="escala-hour-page">
-  <header class="escala-head">
-    <div>
-      <h1><%= inicioFixo17 ? 'Hora extra desde as 17h' : 'Registrar Hora Extra' %></h1>
-      <p><%= inicioFixo17 ? 'Abertura pela gestão para o colaborador que continua trabalhando após o expediente.' : 'Registro individual vinculado ao perfil do mecânico, preferencialmente por OS, com evidências, localização e horário automático.' %></p>
-    </div>
-    <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
-  </header>
-
-  <div class="escala-notice"><%= canManageEscala ? 'Gestão da Manutenção: selecione o colaborador para registrar ou finalizar a hora extra. Os lançamentos ficam vinculados ao funcionário selecionado.' : 'O colaborador é definido pelo usuário autenticado. Mecânicos não podem trocar o lançamento para outro funcionário.' %> Horários são registrados pelo sistema e exibidos no horário de Brasília.</div>
-  <% if (inicioFixo17) { %><div class="escala-notice is-info"><strong>Início fixo às 17h de hoje.</strong> Mesmo que a abertura seja lançada mais tarde, o tempo contará desde as 17h. Se abrir antes, o contador começará às 17h. O fechamento registrará o horário real. O horário e o responsável pelo lançamento ficam preservados no histórico.</div><% } %>
-  <div class="escala-notice is-info"><strong>Priorize a Ordem de Serviço.</strong> Antes de iniciar a Hora Extra, procure uma OS aberta relacionada ao serviço. O vínculo com a OS mantém equipamento, serviço, histórico e Banco de Horas corretamente rastreados. Use <strong>Sem OS</strong> somente quando não existir uma OS correspondente.</div>
-
-  <nav class="escala-tabs">
-    <a class="escala-tab" href="/escala">Painel da Equipe</a>
-    <a class="escala-tab <%= inicioFixo17 ? '' : 'is-active' %>" href="/escala/hora-extra/nova">Registrar Hora Extra</a>
-    <% if (acessoInicioFixo17) { %><a class="escala-tab <%= inicioFixo17 ? 'is-active' : '' %>" href="/escala/hora-extra/desde-17">Hora extra desde as 17h</a><% } %>
-    <% if (canManageEscala) { %><a class="escala-tab" href="/escala/hora-extra/pendentes">Horas Extras Pendentes</a><% } %>
-    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
-    <a class="escala-tab" href="/escala/relatorios">Relatórios</a>
-  </nav>
-
-  <% if (!colaborador) { %>
-    <section class="escala-section"><div class="escala-empty"><%= canManageEscala ? 'Nenhum mecânico ativo cadastrado na equipe de Manutenção. Cadastre os colaboradores antes de registrar horas extras.' : 'Nenhum colaborador mecânico está vinculado ao usuário atual. Faça o vínculo no cadastro do colaborador antes de registrar hora extra.' %></div></section>
-  <% } else { %>
-    <section class="escala-section">
-      <div class="escala-section-head"><div><h2>Colaborador do lançamento</h2><p>Identificação vinculada ao cadastro e ao usuário autenticado.</p></div></div>
-      <% if (canManageEscala && listaColaboradores.length > 1) { %>
-        <form method="GET" action="<%= caminhoFormulario %>" class="escala-toolbar">
-          <label class="escala-field"><span class="label">Colaborador</span><select class="input" name="colaborador_id" onchange="this.form.submit()"><% listaColaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(colaborador.id) === Number(c.id) ? 'selected' : '' %>><%= c.nome %></option><% }) %></select></label>
-          <span class="escala-lock">Gestão • seleção autorizada</span>
-        </form>
-      <% } else { %>
-        <div class="escala-identity"><div class="escala-avatar"><%= String(colaborador.nome || 'M').charAt(0).toUpperCase() %></div><div class="escala-identity-copy"><strong><%= colaborador.nome %></strong><span><%= colaborador.funcaoLabel || colaborador.funcao || 'Mecânico Industrial' %></span></div><span class="escala-lock">🔒 Perfil fixo</span></div>
-      <% } %>
-    </section>
-
-    <% if (emAndamento) { %>
-      <section class="escala-section">
-        <div class="escala-section-head"><div><h2>Hora extra em andamento</h2><p>Finalize somente quando o serviço realmente terminar.</p></div><span class="escala-status is-atestado">Em andamento</span></div>
-        <div class="escala-form-grid">
-          <div class="escala-choice"><strong>Tempo em andamento</strong><div class="escala-extra-clock js-extra-clock" data-start="<%= emAndamento.inicio_extra %>">00h00</div><small>Início: <%= dateBr.formatDateTimeBR(emAndamento.inicio_extra) %></small><% if (emAndamento.inicio_fixo_17h) { %><small>Início fixo às 17h • lançado em <%= dateBr.formatDateTimeBR(emAndamento.criado_em) %></small><small>Antes das 17h, o contador fica em zero e o fechamento não é permitido.</small><% } %></div>
-          <div class="escala-choice"><strong>Origem do serviço</strong><small><%= emAndamento.os_id ? ('OS ' + emAndamento.os_id) : 'Sem OS — serviço justificado' %></small><small><%= emAndamento.descricao_servico || '-' %></small></div>
-        </div>
-        <form method="POST" action="/escala/hora-extra/<%= emAndamento.id %>/finalizar" enctype="multipart/form-data" id="horaExtraFinalizarForm">
-          <input type="hidden" name="latitude_fim"><input type="hidden" name="longitude_fim"><input type="hidden" name="precisao_fim">
-          <div class="escala-form-grid" style="margin-top:12px">
-            <div class="escala-choice full">
-              <strong>📍 Localização da finalização</strong>
-              <small class="js-geo-status" data-context="fim">Obtendo localização...</small>
-              <button class="btn btn-sm js-geo-retry" type="button" data-context="fim">Tentar novamente</button>
-            </div>
-            <div class="escala-photo-box full"><label class="escala-field"><span class="label">Foto final (opcional)</span><input class="input" type="file" name="foto_fim" accept="image/*" capture="environment"><small>Use a câmera quando for necessário registrar a conclusão.</small></label></div>
-          </div>
-          <div class="escala-actionbar"><span class="muted">Ao finalizar, o sistema tenta capturar novamente o GPS e o lançamento seguirá para aprovação mesmo se o aparelho não fornecer localização.</span><button class="btn btn-green" type="submit">Finalizar Hora Extra</button></div>
-        </form>
-      </section>
-    <% } else { %>
-      <section class="escala-section">
-        <div class="escala-section-head"><div><h2><%= inicioFixo17 ? 'Abrir com início às 17h' : 'Iniciar hora extra' %></h2><p>Procure primeiro a OS correspondente. Sem OS, registre obrigatoriamente a descrição técnica.</p></div></div>
-        <% if (inicioFixo17) { %>
-        <form method="POST" action="/escala/hora-extra/desde-17/iniciar" enctype="multipart/form-data" id="horaExtraForm">
-        <% } else { %>
-        <form method="POST" action="/escala/hora-extra/iniciar" enctype="multipart/form-data" id="horaExtraForm">
-        <% } %>
-          <input type="hidden" name="latitude_inicio"><input type="hidden" name="longitude_inicio"><input type="hidden" name="precisao_inicio"><input type="hidden" name="colaborador_id" value="<%= colaborador.id %>">
-          <div class="escala-choice-grid">
-            <div class="escala-choice"><strong>1. Serviço em OS • recomendado</strong><small>Selecione a Ordem de Serviço correspondente para manter rastreabilidade de equipamento, atividade e histórico.</small></div>
-            <div class="escala-choice"><strong>2. Serviço sem OS • exceção</strong><small>Use somente quando nenhuma OS aberta corresponder ao serviço. A descrição manual será obrigatória.</small></div>
-          </div>
-          <div class="escala-form-grid" style="margin-top:12px">
-            <% if(listaOs.length){ %>
-              <div class="escala-field full">
-                <span class="label">Atalhos de OS</span>
-                <div class="quick-os-grid">
-                  <% listaOs.slice(0,6).forEach(os=>{ %>
-                    <button class="quick-os-pill js-quick-os" type="button" data-os-id="<%= os.id %>" title="Selecionar OS <%= os.id %>">
-                      <strong>OS <%= os.id %></strong><small><%= os.equipamento_nome || os.equipamento || 'Equipamento' %></small>
-                    </button>
-                  <% }) %>
-                </div>
-              </div>
-            <% } %>
-            <label class="escala-field full"><span class="label">OS vinculada</span><select class="input" name="os_id" id="horaExtraOs"><option value="">Sem OS — justificar abaixo</option><% listaOs.forEach(os=>{ %><option value="<%= os.id %>" <%= Number(osSelecionadaId) === Number(os.id) ? 'selected' : '' %>>OS <%= os.id %> — <%= os.equipamento_nome || os.equipamento || 'Equipamento' %> — <%= os.descricao %></option><% }) %></select><small><%= listaOs.length %> OS aberta(s) disponível(is) para consulta. A mesma OS pode ter horas extras de mais de um mecânico; não bloqueia outros mecânicos.</small></label>
-            <label class="escala-field full"><span class="label">Descrição do serviço / justificativa</span><textarea class="input" name="descricao_servico" id="horaExtraDescricao" rows="4" placeholder="Ex.: apoio emergencial no triturador FAST; troca de rolamento; solda de reforço..."></textarea><small id="horaExtraDescricaoAjuda">Obrigatória quando não houver OS. Com OS, pode ser usada como complemento.</small></label>
-            <div class="escala-choice full">
-              <strong id="horaExtraLocalizacaoTitulo">📍 <%= inicioFixo17 ? 'Localização no momento do lançamento' : 'Localização do início' %></strong>
-              <small class="js-geo-status" data-context="inicio">Obtendo localização...</small>
-              <button class="btn btn-sm js-geo-retry" type="button" data-context="inicio">Tentar novamente</button>
-            </div>
-            <div class="escala-photo-box full"><span class="label">Foto inicial (opcional)</span><input class="input" type="file" name="foto_inicio" accept="image/*" capture="environment"><small>Registre a condição inicial quando a evidência for necessária.</small></div>
-          </div>
-          <% if (acessoInicioFixo17 && !inicioFixo17) { %>
-            <fieldset class="escala-inicio-opcoes" id="horaExtraModoInicio" aria-describedby="horaExtraInicioResumo">
-              <legend>Início da hora extra</legend>
-              <div class="escala-choice-grid">
-                <label class="escala-inicio-opcao"><input type="radio" name="modo_inicio" value="AGORA" checked required><span><strong>Iniciar agora</strong><small>Usar o horário real ao confirmar a abertura.</small></span></label>
-                <label class="escala-inicio-opcao"><input type="radio" name="modo_inicio" value="FIXO_17H" required><span><strong>Iniciar às 17h de hoje</strong><small>Contar desde o fim do expediente, mesmo que a abertura seja feita mais tarde.</small></span></label>
-              </div>
-              <p id="horaExtraInicioResumo" aria-live="polite">O início será o horário real da abertura.</p>
-            </fieldset>
-          <% } %>
-          <div class="escala-actionbar"><span class="muted" id="horaExtraInicioAviso"><%= inicioFixo17 ? 'Início às 17h de hoje (Brasília). A foto e o GPS correspondem ao momento do lançamento.' : 'O horário é automático. Ao iniciar, o sistema tenta capturar novamente a localização.' %></span><button class="btn btn-green" id="horaExtraIniciarButton" type="submit"><%= inicioFixo17 ? 'Abrir hora extra desde as 17h' : 'Iniciar Hora Extra' %></button></div>
-        </form>
-      </section>
-    <% } %>
-  <% } %>
-
-  <% if (ativasOS.length) { %>
-    <section class="escala-section"><div class="escala-section-head"><div><h2>Equipe ativa na mesma OS</h2><p>Informação de apoio; não permite editar o lançamento de outro mecânico.</p></div></div><div class="escala-team-grid"><% ativasOS.forEach(a=>{ %><article class="escala-person"><div class="escala-person-head"><div class="escala-avatar"><%= String(a.colaborador_nome || 'M').charAt(0).toUpperCase() %></div><div class="escala-person-name"><strong><%= a.colaborador_nome || 'Mecânico' %></strong><small><%= a.descricao_servico || '-' %></small></div><span class="escala-status is-atestado">Em andamento</span></div><div class="escala-person-meta"><div class="escala-meta"><span>Início</span><strong><%= dateBr.formatDateTimeBR(a.inicio_extra) %></strong></div><div class="escala-meta"><span>Contador</span><strong class="js-extra-clock" data-start="<%= a.inicio_extra %>">00h00</strong></div></div></article><% }) %></div></section>
-  <% } %>
-
-  <% const lancamentosFixos17 = listaHistorico.filter(h => h.inicio_fixo_17h); if (lancamentosFixos17.length) { %>
-    <section class="escala-section">
-      <div class="escala-section-head"><div><h2>Aberturas com início às 17h</h2><p>O início contabilizado e o momento real do lançamento ficam separados para conferência.</p></div></div>
-      <div class="escala-table-wrap"><table class="escala-table"><thead><tr><th>Início contabilizado</th><th>Lançado em</th><th>Responsável pela abertura</th></tr></thead><tbody>
-        <% lancamentosFixos17.forEach(h => { %><tr><td><%= dateBr.formatDateTimeBR(h.inicio_extra) %></td><td><%= dateBr.formatDateTimeBR(h.criado_em) %></td><td><%= h.registrado_por_nome || ('Usuário ' + h.user_id) %></td></tr><% }) %>
-      </tbody></table></div>
-    </section>
-  <% } %>
-
-  <section class="escala-section"><div class="escala-section-head"><div><h2>Últimas horas extras</h2><p>Histórico recente do colaborador selecionado.</p></div><span class="muted">Horário de Brasília</span></div><div class="escala-table-wrap"><table class="escala-table"><thead><tr><th>Data</th><th>OS</th><th>Serviço</th><th>Início</th><th>Fim</th><th>Total</th><th>Status</th></tr></thead><tbody><% if(!listaHistorico.length){ %><tr><td colspan="7"><div class="escala-empty">Nenhum registro de hora extra.</div></td></tr><% } %><% listaHistorico.forEach(h=>{ const st=String(h.status||''); const stClass=st.includes('APROV')?'':(st.includes('REPROV')||st.includes('CANCEL')?'is-ausente':'is-atestado'); %><tr><td><strong><%= dateBr.formatDateBR(h.data_servico) %></strong></td><td><%= h.os_id ? ('OS '+h.os_id) : 'Sem OS' %></td><td><%= h.descricao_servico || '-' %></td><td><%= dateBr.formatTimeBR(h.inicio_extra) %></td><td><%= h.fim_extra ? dateBr.formatTimeBR(h.fim_extra) : '-' %></td><td><%= fmtMin(h.total_minutos) %></td><td><span class="escala-status <%= stClass %>"><%= String(h.status || '-').replaceAll('_',' ') %></span></td></tr><% }) %></tbody></table></div></section>
-  </div>
+<div class="escala-page"><div class="escala-hour-page">
+<header class="escala-head"><div><span class="escala-eyebrow">EQUIPE · HORA EXTRA</span><h1><%=inicioFixo17?'Hora extra das 17h':'Registrar hora extra'%></h1></div></header>
+<%- include('_tabs',{escalaTab:'extras'}) %>
+<% if(!colaborador){ %><section class="escala-section"><p>Nenhum funcionário disponível para este registro.</p></section><% }else{ %>
+<section class="escala-section escala-hour-form">
+<% if(canManageEscala&&listaColaboradores.length>1){ %><form method="get" action="<%=caminhoFormulario%>"><label class="escala-field">Funcionário<select class="input" name="colaborador_id" onchange="this.form.submit()"><% listaColaboradores.forEach(c=>{ %><option value="<%=c.id%>" <%=c.id===colaborador.id?'selected':''%>><%=c.nome%></option><% }) %></select></label></form><% }else{ %><div class="escala-identity"><div class="escala-avatar"><%=String(colaborador.nome||'F').charAt(0)%></div><strong><%=colaborador.nome%></strong></div><% } %>
+<% if(emAndamento){ %>
+<header class="escala-section-head" style="margin-top:18px"><h2>Em andamento</h2><span class="escala-status">Iniciada às <%=dateBr.formatTimeBR(emAndamento.inicio_extra)%></span></header>
+<div class="escala-extra-clock js-extra-clock" data-start="<%=emAndamento.inicio_extra%>">0h00</div>
+<p><%=emAndamento.os_id?'OS #'+emAndamento.os_id:'Sem OS'%> · <%=emAndamento.descricao_servico||'Serviço em execução'%></p>
+<form method="post" action="/escala/hora-extra/<%=emAndamento.id%>/finalizar" enctype="multipart/form-data" id="horaExtraFinalizarForm" data-geo-context="fim">
+<input type="hidden" name="latitude_fim"><input type="hidden" name="longitude_fim"><input type="hidden" name="precisao_fim">
+<div class="escala-geo"><div><strong>Localização</strong><small class="js-geo-status" data-context="fim" role="status" aria-live="polite">Permita a localização para finalizar.</small></div><button class="btn js-geo-retry" type="button" data-context="fim">Ativar localização</button></div>
+<details class="escala-compact-details"><summary>Adicionar foto da conclusão</summary><input class="input" type="file" name="foto_fim" accept="image/*" capture="environment"></details>
+<div class="escala-actionbar"><button class="btn btn-green" type="submit" data-geo-submit disabled>Finalizar hora extra</button></div>
+</form>
+<% }else{ %>
+<form method="post" action="<%=inicioFixo17?'/escala/hora-extra/desde-17/iniciar':'/escala/hora-extra/iniciar'%>" enctype="multipart/form-data" id="horaExtraForm" data-geo-context="inicio" data-before-17="<%=inicioFixo17&&!liberado17?'1':'0'%>">
+<input type="hidden" name="colaborador_id" value="<%=colaborador.id%>"><input type="hidden" name="latitude_inicio"><input type="hidden" name="longitude_inicio"><input type="hidden" name="precisao_inicio">
+<div class="escala-form-grid" style="margin-top:16px">
+<label class="escala-field full">Ordem de serviço<select class="input" name="os_id" id="horaExtraOs"><option value="">Sem OS</option><% listaOs.forEach(os=>{ %><option value="<%=os.id%>" <%=Number(osSelecionadaId)===Number(os.id)?'selected':''%>>OS #<%=os.id%> · <%=os.equipamento_nome||os.equipamento||'Equipamento'%> · <%=os.descricao%></option><% }) %></select></label>
+<label class="escala-field full">Serviço realizado<textarea class="input" name="descricao_servico" id="horaExtraDescricao" rows="2" placeholder="Descreva o serviço"></textarea><small id="horaExtraDescricaoAjuda">Obrigatório quando não houver OS.</small></label>
+<% if(acessoInicioFixo17&&!inicioFixo17){ %><label class="escala-field full">Início<select class="input" name="modo_inicio" id="horaExtraModoInicio"><option value="AGORA">Agora</option><option value="FIXO_17H" <%=liberado17?'':'disabled'%>>Desde as 17h de hoje</option></select></label><% } %>
 </div>
-
-<script>
-(function(){
-  const formInicio=document.getElementById('horaExtraForm');
-  const formFim=document.getElementById('horaExtraFinalizarForm');
-  const os=document.getElementById('horaExtraOs');
-  const descricao=document.getElementById('horaExtraDescricao');
-  const ajuda=document.getElementById('horaExtraDescricaoAjuda');
-  const openOsCount=<%- JSON.stringify(listaOs.length) %>;
-
-  function atualizarModoInicio(){
-    const escolha=formInicio?.querySelector('[name="modo_inicio"]:checked');
-    if(!escolha)return;
-    const fixo=escolha.value==='FIXO_17H';
-    const resumo=document.getElementById('horaExtraInicioResumo');
-    const aviso=document.getElementById('horaExtraInicioAviso');
-    const titulo=document.getElementById('horaExtraLocalizacaoTitulo');
-    const botao=document.getElementById('horaExtraIniciarButton');
-    if(resumo)resumo.textContent=fixo?'O início será às 17h de hoje (Brasília). Antes desse horário, o contador ficará em zero. O fechamento usará o horário real.':'O início será o horário real da abertura.';
-    if(aviso)aviso.textContent=fixo?'Início às 17h de hoje (Brasília). A foto e o GPS correspondem ao momento do lançamento.':'O horário é automático. Ao iniciar, o sistema tenta capturar novamente a localização.';
-    if(titulo)titulo.textContent=fixo?'📍 Localização no momento do lançamento':'📍 Localização do início';
-    if(botao)botao.textContent=fixo?'Iniciar Hora Extra às 17h':'Iniciar Hora Extra';
-  }
-  formInicio?.querySelectorAll('[name="modo_inicio"]').forEach(input=>input.addEventListener('change',atualizarModoInicio));
-  atualizarModoInicio();
-
-  function atualizarObrigatoriedade(){
-    if(!descricao)return;
-    const semOs=!os||!os.value;
-    descricao.required=semOs;
-    if(ajuda)ajuda.textContent=semOs?'Obrigatória: informe onde e qual serviço foi executado.':'Opcional: use como complemento técnico da OS.';
-  }
-  os?.addEventListener('change',atualizarObrigatoriedade);
-  document.querySelectorAll('.js-quick-os').forEach(btn=>btn.addEventListener('click',()=>{
-    if(!os)return;
-    os.value=btn.dataset.osId||'';
-    document.querySelectorAll('.js-quick-os').forEach(item=>item.classList.toggle('is-active',item===btn));
-    atualizarObrigatoriedade();
-  }));
-  atualizarObrigatoriedade();
-
-  function geoStatus(context,text){
-    const el=document.querySelector('.js-geo-status[data-context="'+context+'"]');
-    if(el)el.textContent=text;
-  }
-  function geoField(name,value){
-    const el=document.querySelector('[name="'+name+'"]');
-    if(el)el.value=value==null?'':value;
-  }
-  function geoErrorMessage(err){
-    if(err&&err.code===1)return 'Permissão de localização negada. Você pode continuar o lançamento, mas o registro ficará sem GPS.';
-    if(err&&err.code===2)return 'GPS indisponível no aparelho. Você pode continuar o lançamento.';
-    if(err&&err.code===3)return 'Tempo esgotado ao obter GPS. Tente novamente ou continue o lançamento.';
-    return 'Não foi possível obter a localização. Você pode continuar o lançamento.';
-  }
-  function captureGeo(context){
-    geoStatus(context,'Obtendo localização...');
-    return new Promise(resolve=>{
-      if(!navigator.geolocation){geoStatus(context,'GPS não disponível neste navegador.');return resolve(false);}
-      navigator.geolocation.getCurrentPosition(p=>{
-        geoField('latitude_'+context,p.coords.latitude);
-        geoField('longitude_'+context,p.coords.longitude);
-        geoField('precisao_'+context,p.coords.accuracy);
-        const precisao=Number.isFinite(p.coords.accuracy)?Math.round(p.coords.accuracy):null;
-        geoStatus(context,'✅ Localização capturada'+(precisao!==null?' • precisão aproximada ±'+precisao+' m':''));
-        resolve(true);
-      },err=>{
-        geoStatus(context,'⚠ '+geoErrorMessage(err));
-        resolve(false);
-      },{enableHighAccuracy:true,timeout:8000,maximumAge:30000});
-    });
-  }
-
-  document.querySelectorAll('.js-geo-retry').forEach(btn=>btn.addEventListener('click',()=>captureGeo(btn.dataset.context)));
-
-  async function submitComGeo(form,context){
-    if(!form||form.dataset.geoSubmitting==='1')return;
-    form.dataset.geoSubmitting='1';
-    const button=form.querySelector('button[type="submit"]');
-    if(button){button.disabled=true;button.dataset.originalText=button.textContent;button.textContent='Obtendo localização...';}
-    await captureGeo(context);
-    if(button){button.textContent=button.dataset.originalText||'Continuar';}
-    form.submit();
-  }
-
-  formInicio?.addEventListener('submit',function(ev){
-    ev.preventDefault();
-    atualizarObrigatoriedade();
-    if(descricao&&descricao.required&&!descricao.value.trim()){descricao.focus();return;}
-    if(os&&!os.value&&openOsCount>0){
-      const ok=window.confirm('Existem '+openOsCount+' Ordem(ns) de Serviço aberta(s). Confirme que nenhuma delas corresponde ao serviço que será realizado. Deseja continuar como Sem OS?');
-      if(!ok)return;
-    }
-    submitComGeo(formInicio,'inicio');
-  });
-  formFim?.addEventListener('submit',function(ev){ev.preventDefault();submitComGeo(formFim,'fim');});
-
-  function clock(){document.querySelectorAll('.js-extra-clock').forEach(el=>{const start=new Date(el.dataset.start);if(Number.isNaN(start.getTime()))return;const min=Math.max(0,Math.floor((Date.now()-start.getTime())/60000));el.textContent=Math.floor(min/60)+'h'+String(min%60).padStart(2,'0');});}
-
-  if(formInicio)captureGeo('inicio');
-  if(formFim)captureGeo('fim');
-  clock();
-  setInterval(clock,30000);
-})();
-</script>
+<% if(inicioFixo17){ %><p><%=liberado17?'Início contado a partir das 17h de hoje.':'Disponível a partir das 17h.'%></p><% } %>
+<div class="escala-geo"><div><strong>Localização</strong><small class="js-geo-status" data-context="inicio" role="status" aria-live="polite">Permita a localização para iniciar.</small></div><button class="btn js-geo-retry" type="button" data-context="inicio">Ativar localização</button></div>
+<details class="escala-compact-details"><summary>Adicionar foto inicial</summary><input class="input" type="file" name="foto_inicio" accept="image/*" capture="environment"></details>
+<div class="escala-actionbar"><button class="btn btn-green" id="horaExtraIniciarButton" type="submit" data-geo-submit disabled><%=inicioFixo17?'Iniciar desde as 17h':'Iniciar hora extra'%></button></div>
+</form>
+<% } %>
+</section>
+<details class="escala-section escala-hour-history"><summary>Histórico recente</summary><div class="escala-table-wrap"><table class="escala-table"><thead><tr><th>Data</th><th>Serviço</th><th>Início</th><th>Fim</th><th>Total</th><th>Situação</th></tr></thead><tbody><% if(!listaHistorico.length){ %><tr><td colspan="6">Sem registros.</td></tr><% } %><% listaHistorico.forEach(h=>{ %><tr><td><%=dateBr.formatDateBR(h.data_servico)%></td><td><%=h.os_id?'OS #'+h.os_id:h.descricao_servico%></td><td><%=dateBr.formatTimeBR(h.inicio_extra)%></td><td><%=h.fim_extra?dateBr.formatTimeBR(h.fim_extra):'—'%></td><td><%=fmtMin(h.total_minutos)%></td><td><%=String(h.status).replaceAll('_',' ')%></td></tr><% }) %></tbody></table></div></details>
+<% } %>
+</div></div>
+<script src="/js/escala-localizacao.js?v=20261103-v1" defer></script>

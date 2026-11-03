@@ -39,7 +39,7 @@ test('painel da Escala entrega KPIs filtros cards e tabela', () => {
   assert.match(index, /escala-search/);
   assert.match(index, /data-view-mode="cards"/);
   assert.match(index, /data-view-mode="table"/);
-  assert.match(index, /controle operacional interno/i);
+  assert.doesNotMatch(index, /controle operacional interno/i);
 });
 
 test('Banco de Horas e filas operacionais usam o design system novo', () => {

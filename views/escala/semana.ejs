@@ -1,5 +1,6 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
   const linhas = semana?.linhas || [];
   const totalDia = linhas.filter(l => String(l.turnoLabel || '').toUpperCase().includes('DIA')).length;
@@ -15,16 +16,8 @@
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
   </header>
 
-  <% if (!canManageEscala) { %><div class="escala-notice is-info">Escala em modo somente leitura. Alterações continuam restritas à gestão da Manutenção.</div><% } %>
 
-  <nav class="escala-tabs">
-    <a class="escala-tab" href="/escala">Painel da Equipe</a>
-    <a class="escala-tab is-active" href="/escala/semana">Escala da Semana</a>
-    <a class="escala-tab" href="/escala/completa">Escala Completa</a>
-    <a class="escala-tab" href="/escala/ausencias">Folgas / Afastamentos</a>
-    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
-    <a class="escala-tab" href="/escala/relatorios">Relatórios</a>
-  </nav>
+  <%- include('_tabs',{escalaTab:'escalas'}) %>
 
   <section class="escala-kpis">
     <div class="escala-kpi"><span>Equipe na semana</span><strong><%= linhas.length %></strong><small>Colaboradores programados</small></div>
@@ -62,14 +55,14 @@
             <div class="escala-meta"><span>Período</span><strong><%= semana?.data_inicio || '-' %> → <%= semana?.data_fim || '-' %></strong></div>
           </div>
           <% if (l.observacao) { %><div class="muted" style="margin-top:10px"><strong>Observação:</strong> <%= l.observacao %></div><% } %>
-          <% if (canManageEscala && semana) { %><div class="escala-person-foot" style="gap:6px"><a class="btn btn-sm btn-green" href="/escala/editar/<%= semana.id %>">Editar</a><form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm" type="submit">Excluir</button></form></div><% } %>
+          <% if (canManageEscala && semana) { %><div class="escala-person-foot" style="gap:6px"><a class="btn btn-sm btn-green" href="/escala/editar/<%= semana.id %>">Editar</a><form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm" type="submit">Retirar desta semana</button></form></div><% } %>
         </article>
       <% }) %>
     </div>
   </section>
 
   <% if (canManageEscala) { %>
-  <section class="escala-section">
+  <section class="escala-section" id="adicionar">
     <div class="escala-section-head"><div><h2>Adicionar à escala</h2><p>Inclua um colaborador sem alterar a lógica do rodízio existente.</p></div></div>
     <form method="POST" action="/escala/adicionar" class="escala-form-grid is-3">
       <input type="hidden" name="date" value="<%= alvo %>">

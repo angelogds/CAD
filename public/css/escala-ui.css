@@ -1,0 +1,43 @@
+.escala-page {--escala-green:#159947;--escala-soft:#e7f7ed;color:#151b17;max-width:1480px;margin:auto;padding:24px 12px 48px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.escala-page * {box-sizing:border-box}
+.escala-page [hidden] {display:none!important}
+.escala-page h1 {font-size:clamp(28px,3vw,38px);line-height:1.2;letter-spacing:-.02em;margin:10px 0 14px;color:#151b17}
+.escala-page :is(h2,h3,strong,label,summary) {color:#151b17}
+.escala-page p {line-height:1.5;color:#424c46}
+.escala-page .escala-head {display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px!important;border:1px solid #d3ebda;border-radius:18px;background:linear-gradient(115deg,#d9f6e2,#f4fcf6 65%,#fff);margin:0 0 24px!important}
+.escala-eyebrow {display:block;border-left:4px solid #16a34a;padding-left:10px;font-size:11px;font-weight:700;letter-spacing:.06em}
+.escala-page :is(.btn,.escala-tab,.ui-btn,.quick-os-pill) {min-height:44px!important;display:inline-flex;align-items:center;justify-content:center;padding:10px 15px!important;border-radius:10px!important;font-size:13px!important;line-height:1.3;gap:7px;text-decoration:none;color:#151b17!important;box-shadow:none;white-space:normal}
+.escala-page .btn {background:#fff;border:1px solid #cbded1}
+.escala-page :is(.btn-green,.btn-primary) {background:#6cde8d!important;border:1px solid #159947!important;color:#151b17!important}
+.escala-page :is(button,input,select,textarea,a,summary):focus-visible {outline:3px solid #15803d;outline-offset:3px}
+.escala-page :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea) {font-size:14px!important;min-height:44px;border:1px solid #cbded1;border-radius:10px;max-width:100%;color:#151b17;background:#fff}
+.escala-page label {font-size:13px;font-weight:600}
+.escala-page .escala-main-tabs {display:flex;gap:10px;padding:0;background:transparent;border:0;margin:0 0 24px;overflow:visible}
+.escala-page .escala-main-tabs .escala-tab {flex:1;min-width:0;background:#dff5e5!important;border:1px solid #9ad6ad!important;font-weight:650;text-align:center}
+.escala-page .escala-main-tabs .is-active {background:#6cde8d!important;border-color:#159947!important;font-weight:750}
+.escala-page .escala-section {background:#fff;border:1px solid #dce8df;border-radius:16px;padding:22px;margin:0 0 20px;box-shadow:none}
+.escala-page .escala-kpi {background:linear-gradient(145deg,#fff 40%,#e8f8ec);border:1px solid #d7e7dc;border-top:4px solid #20b35b;border-radius:14px;padding:20px}
+.escala-page .escala-kpi strong {color:#151b17}
+.escala-page .escala-quick-grid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.escala-page .escala-quick-card {display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px;padding:16px;border:1px solid #cbe6d3;background:#effaf2;border-radius:12px;text-decoration:none;color:#151b17}
+.escala-page .escala-person {border:1px solid #d8e9de;border-radius:14px;background:#fff;box-shadow:none}
+.escala-page :is(.escala-table,.escala-bank-table,.approval-table,.self-table) th {background:#e8f7ed;color:#151b17}
+.escala-page :is(.escala-meta,.approval-field) {background:#f3faf5;border-radius:10px}
+.escala-page .escala-actions {display:flex;gap:8px;flex-wrap:wrap}
+.escala-page .escala-hour-page {max-width:1100px;margin:auto}
+.escala-page .escala-hour-form {max-width:760px;margin:auto}
+.escala-page .escala-geo {display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #cbe6d3;background:#eef9f1;padding:12px;border-radius:12px;margin:14px 0}
+.escala-page .escala-geo small {display:block;line-height:1.4;font-size:12px}
+.escala-page button:disabled {opacity:.55;cursor:not-allowed}
+.escala-page .escala-hour-history {margin-top:20px}
+.escala-page .escala-actionbar {position:static;display:flex;justify-content:flex-end;gap:10px;background:transparent;padding:14px 0 0;border:0;box-shadow:none}
+.escala-page .escala-actionbar .btn {min-width:160px}
+.escala-page .escala-compact-details {margin:14px 0}
+.escala-page .escala-compact-details summary {cursor:pointer;font-size:13px;min-height:36px;display:flex;align-items:center}
+@media(max-width:900px){.escala-page .escala-main-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.escala-page .escala-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.escala-page{padding:16px 8px 40px}.escala-page .escala-head{padding:18px!important;flex-wrap:wrap;gap:12px}.escala-page h1{font-size:28px}.escala-page .escala-section{padding:16px}.escala-page .escala-quick-card{padding:12px;font-size:13px}.escala-page .escala-main-tabs .escala-tab{font-size:11px!important;padding:10px 6px!important}.escala-page .escala-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.escala-page .escala-kpi{padding:14px}.escala-page .escala-form-grid{grid-template-columns:1fr}.escala-page .escala-geo{flex-wrap:wrap}.escala-page .escala-actionbar .btn{width:100%}.escala-page .escala-head .escala-actions{width:100%}.escala-page .escala-hour-page>.escala-section{margin-bottom:14px}}
+
+.escala-page .escala-gerenciar-equipe summary{font-weight:700;cursor:pointer;min-height:44px;display:flex;align-items:center}.escala-page .escala-gerenciar-equipe p{color:#37483e}.escala-page .escala-gestao-pessoa{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #dfebe3}.escala-page .escala-gestao-pessoa form{margin:0}
+
+.escala-page .escala-head h1{font-size:clamp(28px,3vw,38px);line-height:1.2;letter-spacing:-.02em;margin:10px 0 14px;color:#151b17}.escala-page .escala-head{text-align:left}.escala-page .escala-tabs:not(.escala-main-tabs) .is-active{background:#6cde8d!important;border-color:#159947!important;color:#151b17!important}
+@media(max-width:760px){.escala-page .escala-head h1{font-size:28px}.escala-page .escala-person-meta{grid-template-columns:repeat(2,minmax(0,1fr))!important}.escala-page .escala-person-meta .escala-meta{min-width:0;padding:10px}.escala-page .escala-person-meta strong{overflow-wrap:anywhere}.escala-page .escala-kpi strong{font-size:24px}.escala-page .escala-person{padding:14px}}

@@ -1,12 +1,13 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <div class="escala-page">
   <header class="escala-head">
     <div><h1>Lançar Escala</h1><p>Registro manual de colaborador no turno dia ou noite, mantendo a lógica existente do módulo.</p></div>
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
   </header>
 
-  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/semana">Escala da Semana</a><a class="escala-tab" href="/escala/completa">Escala Completa</a><a class="escala-tab is-active" href="/escala/nova">Novo lançamento</a></nav>
+  <%- include('_tabs',{escalaTab:'escalas'}) %>
 
   <div class="escala-notice is-info">Use o lançamento manual somente para inclusão pontual. Para organização recorrente de plantões e turnos, utilize a configuração de rodízio.</div>
 
