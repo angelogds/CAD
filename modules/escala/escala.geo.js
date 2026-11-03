@@ -16,13 +16,23 @@ const GEO_UNIDADE_CAMPO_DO_GADO = Object.freeze({
 });
 
 function toNumberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
+  if (value === null || value === undefined || !['string','number'].includes(typeof value) || String(value).trim() === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
 function hasUnitCoordinates(unidade = GEO_UNIDADE_CAMPO_DO_GADO) {
-  return Number.isFinite(Number(unidade.latitude)) && Number.isFinite(Number(unidade.longitude));
+  return toNumberOrNull(unidade.latitude) !== null && toNumberOrNull(unidade.longitude) !== null;
+}
+
+function exigirLocalizacao(dados, contexto) {
+  const lat=toNumberOrNull(dados['latitude_'+contexto]);
+  const lon=toNumberOrNull(dados['longitude_'+contexto]);
+  const precisao=toNumberOrNull(dados['precisao_'+contexto]);
+  if(lat===null||lon===null||precisao===null||Math.abs(lat)>90||Math.abs(lon)>180||precisao<0) {
+    throw new Error('Permita a localização e capture o GPS para registrar a hora extra.');
+  }
+  return {latitude:lat,longitude:lon,precisao};
 }
 
 function calcularDistanciaMetros(lat1, lon1, lat2, lon2) {
@@ -66,6 +76,7 @@ function classificarLocalizacao({ latitude, longitude, status, unidade = GEO_UNI
 }
 
 module.exports = {
+  exigirLocalizacao,
   STATUS_LOCALIZACAO,
   GEO_UNIDADE_CAMPO_DO_GADO,
   calcularDistanciaMetros,

@@ -58,7 +58,7 @@ exports.index = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
     const painel = service.listarPainelEscala({ user: currentUser(req), canViewAll: canViewAllEscala(req), colaboradorId: visibleColaboradorId(req) });
-    return res.render("escala/index", { title: "Escala", painel, canManageEscala: canManageEscala(req), canViewAllEscala: canViewAllEscala(req), canReadEscalaDetails: canViewAllEscala(req) || Boolean(visibleColaboradorId(req)) });
+    return res.render("escala/index", { title: "Escala", painel, equipeGerenciavel: canManageEscala(req) ? service.listarColaboradoresManutencao() : [], canManageEscala: canManageEscala(req), podeInicioFixo17:service.canIniciarHoraExtraDesde17(currentUser(req)), canViewAllEscala: canViewAllEscala(req), canReadEscalaDetails: canViewAllEscala(req) || Boolean(visibleColaboradorId(req)) });
   } catch (e) {
     next(e);
   }
@@ -501,7 +501,7 @@ function selecionarColaboradorHoraExtra(req, colaboradores) {
   const requestedId = Number(req.body?.colaborador_id || req.query?.colaborador_id || 0);
   if (requestedId) {
     const selecionado = colaboradores.find((c) => Number(c.id) === requestedId);
-    if (selecionado) return selecionado;
+    return selecionado || null;
   }
   return colaboradores[0] || null;
 }
@@ -526,6 +526,7 @@ function renderHoraExtra(req, res, next, modoInicioFixo17 = false) { try {
     osDisponiveis: service.listarOsDisponiveisParaHoraExtra(),
     canManageEscala: podeInicioFixo17 || canManageEscala(req),
     podeInicioFixo17,
+    podeAbrir17Agora:require('../../utils/turno-operacional').getAgoraSaoPauloParts().totalMinutes>=17*60,
     modoInicioFixo17,
   });
 } catch(e){ next(e); } }
@@ -584,8 +585,8 @@ exports.reprovarHoraExtra = (req, res) => { try { service.reprovarHoraExtra(Numb
 exports.ajustarHoraExtra = (req, res) => { try { service.ajustarHoraExtra(Number(req.params.id), req.body, currentUser(req)); flashSuccess(req, 'Hora extra ajustada.'); } catch(e){ flashError(req, e.message); } return redirectBack(req, res, '/escala/hora-extra/pendentes'); };
 exports.cancelarHoraExtra = (req, res) => { try { service.cancelarHoraExtra(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Hora extra cancelada.'); } catch(e){ flashError(req, e.message); } return redirectBack(req, res, '/escala/hora-extra/pendentes'); };
 exports.apagarHoraExtra = (req, res) => { try { service.apagarHoraExtra(Number(req.params.id), currentUser(req)); flashSuccess(req, 'Lançamento de hora extra apagado e banco de horas atualizado.'); } catch(e){ flashError(req, e.message); } return redirectBack(req, res, '/escala/hora-extra/pendentes'); };
-exports.bancoHoras = (req, res, next) => { try { const user=currentUser(req); const own=service.buscarColaboradorDoUsuario(user.id); const all=canViewAllEscala(req); const banco=service.listarBancoHoras({ colaborador_id: all ? null : own?.id }); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado: null, movimentos: [], horasExtras: [], folgas: [], canManageEscala: canManageEscala(req), canViewAllEscala: all }); } catch(e){ next(e); } };
-exports.bancoHorasFuncionario = (req, res, next) => { try { let id=Number(req.params.colaboradorId); const user=currentUser(req); const own=service.buscarColaboradorDoUsuario(user.id); const all=canViewAllEscala(req); if(!all && own?.id !== id) return res.status(403).send('Acesso negado. Mecânico visualiza apenas o próprio banco de horas.'); const banco=service.listarBancoHoras({ colaborador_id: all ? null : own?.id }); const selecionado=banco.find(c=>c.id===id); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado, movimentos: service.listarMovimentosBancoHoras(id), horasExtras: service.listarHorasExtras({colaborador_id:id}), folgas: service.listarFolgas({colaborador_id:id}), canManageEscala: canManageEscala(req), canViewAllEscala: all }); } catch(e){ next(e); } };
+exports.bancoHoras = (req, res, next) => { try { const user=currentUser(req); const own=service.buscarColaboradorDoUsuario(user.id); const all=canViewAllEscala(req); const banco=(!all&&!own) ? [] : service.listarBancoHoras({ colaborador_id: all ? null : own?.id }); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado: null, movimentos: [], horasExtras: [], folgas: [], canManageEscala: canManageEscala(req), canViewAllEscala: all }); } catch(e){ next(e); } };
+exports.bancoHorasFuncionario = (req, res, next) => { try { let id=Number(req.params.colaboradorId); const user=currentUser(req); const own=service.buscarColaboradorDoUsuario(user.id); const all=canViewAllEscala(req); if(!all && own?.id !== id) return res.status(403).send('Acesso negado. Mecânico visualiza apenas o próprio banco de horas.'); const banco=(!all&&!own) ? [] : service.listarBancoHoras({ colaborador_id: all ? null : own?.id }); const selecionado=banco.find(c=>c.id===id); if(!selecionado) return res.status(404).send('Colaborador fora da Escala.'); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado, movimentos: service.listarMovimentosBancoHoras(id), horasExtras: service.listarHorasExtras({colaborador_id:id}), folgas: service.listarFolgas({colaborador_id:id}), canManageEscala: canManageEscala(req), canViewAllEscala: all }); } catch(e){ next(e); } };
 exports.folgas = (req, res, next) => { try { return res.render('escala/folgas-programadas', { title: 'Programar Folga', colaboradores: service.listarBancoHoras(), folgas: service.listarFolgas() }); } catch(e){ next(e); } };
 exports.programarFolga = (req, res) => { try { service.programarFolgaCompensatoria({ ...req.body, anexo_path: uploadPath(req), minutos_descontados: Math.round(Number(req.body.horas || 0) * 60) || Number(req.body.minutos_descontados), usuario: currentUser(req), user_id: currentUser(req).id }); flashSuccess(req, 'Afastamento programado com sucesso.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/folgas'); };
 exports.cancelarFolga = (req, res) => { try { service.cancelarFolgaCompensatoria(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Folga cancelada e saldo estornado.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/folgas'); };
@@ -634,3 +635,5 @@ exports.previewRodizio = (req, res) => { try { const preview = service.gerarPrev
 exports.aplicarRodizio = (req, res) => { let redirectPeriodo = ''; try { const r = service.aplicarRodizioNaEscala(req.body, currentUser(req)); reprocessarPreventivasComNovaEscala(); redirectPeriodo = `?data_inicio=${encodeURIComponent(r.periodoInicio)}&data_fim=${encodeURIComponent(r.periodoFim)}`; flashSuccess(req, `Escala recalculada e aplicada com sucesso. ${r.semanasAtualizadas} semana(s) atualizada(s). ${r.semanasPreservadasPorAjusteManual} ajuste(s) manual(is) preservado(s).`); } catch(e){ flashError(req, e.message); } return res.redirect(`/escala/completa${redirectPeriodo}`); };
 exports.recalcularRodizio = (req, res) => { let redirectPeriodo = ''; try { const r = service.recalcularEscalaPorRodizio(req.body.config_id, req.body, currentUser(req)); reprocessarPreventivasComNovaEscala(); redirectPeriodo = `?data_inicio=${encodeURIComponent(r.periodoInicio)}&data_fim=${encodeURIComponent(r.periodoFim)}`; flashSuccess(req, `Escala recalculada pelo rodízio. ${r.semanasAtualizadas} semana(s) atualizada(s), ${r.semanasPreservadasPorAjusteManual} ajuste(s) manual(is) preservado(s).`); } catch(e){ flashError(req, e.message); } return res.redirect(`/escala/completa${redirectPeriodo}`); };
 exports.desativarRodizio = (req, res) => { try { service.desativarRodizio?.(Number(req.params.id)); flashSuccess(req, 'Rodízio desativado.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/rodizio'); };
+
+exports.excluirColaborador = (req,res) => { try { service.excluirColaboradorDaEscala(Number(req.params.id),currentUser(req)); flashSuccess(req,'Colaborador excluído da Escala e das horas extras. Os registros serão apagados em seis meses.'); } catch(e) { flashError(req,e.message); } return res.redirect('/escala'); };

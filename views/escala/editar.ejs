@@ -1,5 +1,6 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
   const alocacoes = semana?.alocacoes || [];
   const noturnosAtuais = alocacoes.filter(a=>a.tipo_turno==='noturno').map(a=>Number(a.colaborador_id));
@@ -11,7 +12,7 @@
     <div class="escala-actions"><a class="btn" href="/escala/completa">← Voltar</a><a class="btn" href="/escala/pdf/semana/<%= semana.id %>">PDF da Semana</a></div>
   </header>
 
-  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/semana">Escala da Semana</a><a class="escala-tab is-active" href="/escala/completa">Escala Completa</a><a class="escala-tab" href="/escala/rodizio">Rodízio</a></nav>
+  <%- include('_tabs',{escalaTab:'escalas'}) %>
 
   <% if (semana.ajuste_manual) { %><div class="escala-notice is-warning">Esta semana possui ajuste manual. O recálculo do rodízio continuará preservando-a, salvo quando a opção de sobrescrever ajustes manuais for usada.</div><% } %>
 

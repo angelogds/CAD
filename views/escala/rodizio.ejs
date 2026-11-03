@@ -1,5 +1,6 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <% const modoAtual = config?.modo_noturno === 'dupla' ? 'dupla' : 'individual'; const tamanhoCiclo = Math.max(Number(config?.tamanho_ciclo||3),3); %>
 <div class="escala-page">
   <header class="escala-head">
@@ -7,7 +8,7 @@
     <div class="escala-actions"><a class="btn" href="/escala/completa">← Voltar</a></div>
   </header>
 
-  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/semana">Escala da Semana</a><a class="escala-tab" href="/escala/completa">Escala Completa</a><a class="escala-tab is-active" href="/escala/rodizio">Rodízio</a><a class="escala-tab" href="/escala/folgas-sabado">Folgas / Sábado</a></nav>
+  <%- include('_tabs',{escalaTab:'escalas'}) %>
 
   <div class="escala-notice is-warning">Alterações no rodízio podem afetar semanas futuras. Semanas com ajuste manual continuam preservadas, exceto quando a opção de sobrescrever tudo for escolhida de forma explícita.</div>
 

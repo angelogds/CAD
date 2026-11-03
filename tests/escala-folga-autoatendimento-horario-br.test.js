@@ -60,7 +60,7 @@ test('views simplificam aprovação e exibem datas formatadas', () => {
   assert.match(he, /dateBr\.formatDateBR\(h\.data_servico\)/);
   assert.match(he, /dateBr\.formatTimeBR\(h\.inicio_extra\)/);
   assert.doesNotMatch(he, /<%=\s*h\.inicio_extra\s*\|\|/);
-  assert.match(he, /Fila de aprovação/);
+  assert.match(he, /Fila de validação/);
   assert.match(he, /<details class="approval-details">/);
   assert.match(self, /Solicitar folga pelo Banco de Horas/);
   assert.match(self, /name="periodo_folga"/);
@@ -71,9 +71,9 @@ test('views simplificam aprovação e exibem datas formatadas', () => {
   assert.match(folgas, /Solicitações aguardando aprovação/);
   assert.match(folgas, /saldo fica até -0h30/);
   assert.match(folgas, /\/folgas\/solicitacoes\/<%= s\.id %>\/aprovar/);
-  assert.match(nova, /dateBr\.formatDateTimeBR\(emAndamento\.inicio_extra\)/);
-  assert.match(nova, /quick-os-grid/);
-  assert.match(nova, /js-quick-os/);
+  assert.match(nova, /dateBr\.formatTimeBR\(emAndamento\.inicio_extra\)/);
+  assert.match(nova, /id="horaExtraOs"/);
+  assert.match(nova, /data-geo-submit disabled/);
 });
 
 test('interfaces públicas do RH e colaborador não expõem ADMIN como fluxo nominal', () => {

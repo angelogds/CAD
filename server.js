@@ -413,6 +413,12 @@ mount("/acompanhamento-compras", "./modules/acompanhamento-compras/acompanhament
 mount(OFFICIAL_ROUTES.estoque, "./modules/estoque/estoque.routes");
 mount(OFFICIAL_ROUTES.almoxarifado, "./modules/almoxarifado/almoxarifado.routes");
 mount("/escala", "./modules/escala/escala.routes");
+function purgarEscalaExpirada() {
+  try { require('./modules/escala/escala.service').purgarRegistrosExpirados(); }
+  catch (error) { console.warn('[ESCALA_RETENCAO]', error.message); }
+}
+purgarEscalaExpirada();
+trackInterval(setInterval(purgarEscalaExpirada, 60 * 60 * 1000));
 mount(OFFICIAL_ROUTES.rh, "./modules/rh/rh.routes");
 mount("/colaboradores", "./modules/colaboradores/colaboradores.routes");
 mount("/meu-portal", "./modules/meu-portal/meu-portal.routes");

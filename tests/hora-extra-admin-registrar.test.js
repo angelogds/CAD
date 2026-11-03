@@ -45,6 +45,6 @@ test('admin seleciona mecânico cadastrado e usa a mesma validação das rotas P
   assert.match(routes, /router\.post\("\/hora-extra\/:id\/finalizar", requireLogin, requireHoraExtraAccess/);
   assert.match(controller, /if \(canManageEscala\(req\)\) return colaboradores/);
   assert.match(controller, /service\.listarColaboradoresMecanicosHoraExtra\(\)/);
-  assert.match(view, /canManageEscala \? 'Gestão da Manutenção:/);
-  assert.match(view, /if \(canManageEscala && listaColaboradores\.length > 1\)/);
+  assert.match(view, /name="colaborador_id"/);
+  assert.match(view, /if\(canManageEscala&&listaColaboradores\.length>1\)/);
 });

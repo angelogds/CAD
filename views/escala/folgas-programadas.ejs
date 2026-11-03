@@ -1,6 +1,7 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
 <link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
   const listaFolgas = Array.isArray(folgas) ? folgas : [];
   const listaSolicitacoes = Array.isArray(solicitacoes) ? solicitacoes : [];
@@ -15,14 +16,7 @@
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a><a class="btn" href="/escala/banco-horas">Banco de Horas</a></div>
   </header>
 
-  <nav class="escala-tabs">
-    <a class="escala-tab" href="/escala">Painel da Equipe</a>
-    <a class="escala-tab" href="/escala/semana">Escala da Semana</a>
-    <a class="escala-tab" href="/escala/completa">Escala Completa</a>
-    <a class="escala-tab is-active" href="/escala/folgas">Folgas</a>
-    <a class="escala-tab" href="/escala/ausencias">Afastamentos</a>
-    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
-  </nav>
+  <%- include('_tabs',{escalaTab:'ausencias'}) %>
 
   <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente uma folga por dia é aprovada normalmente. Pedido adicional exige justificativa e autorização do encarregado, supervisor ou gestão do sistema. Entrada/saída de 1h consome 1h; meio período consome 4h; com 3h30 ou mais, a liderança pode aprovar e o saldo fica até -0h30.</div>
 

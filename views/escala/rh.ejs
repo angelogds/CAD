@@ -1,6 +1,7 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903a">
 <link rel="stylesheet" href="/css/escala-rh-self.css?v=20260903a">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <%
   const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };
 %>
@@ -9,6 +10,7 @@
     <div><h1>Escala • RH</h1><p>Consulta centralizada de disponibilidade, horas extras, banco de horas e histórico operacional da equipe.</p></div>
     <div class="escala-actions"><a class="btn" href="/escala/semana">Escala da semana</a><a class="btn btn-green" href="/escala/relatorios">Relatórios PDF</a></div>
   </header>
+<%- include('_tabs',{escalaTab:'escalas'}) %>
 
   <div class="escala-notice">Painel de consulta do RH com dados já registrados pela Manutenção. A gestão técnica da escala e a aprovação das horas extras continuam sob responsabilidade dos perfis autorizados da Manutenção.</div>
 

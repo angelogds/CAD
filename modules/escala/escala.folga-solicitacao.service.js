@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const escala = require('./escala.service');
+const retencao = require('./escala.retencao.service');
 const { normalizeRole, canAccessModule } = require('../../config/rbac');
 const dateBr = require('../../utils/data-hora-br');
 
@@ -75,7 +76,7 @@ function getSolicitacao(id) {
   return db.prepare(`
     SELECT s.*, c.nome AS colaborador_nome, c.funcao, u.name AS decidido_por_nome
     FROM escala_folga_solicitacoes s
-    JOIN colaboradores c ON c.id = s.colaborador_id
+    JOIN colaboradores c ON c.id = s.colaborador_id AND ${retencao.sqlVisibilidade(db)}
     LEFT JOIN users u ON u.id = s.decidido_por
     WHERE s.id = ?
     LIMIT 1
@@ -93,7 +94,7 @@ function listarSolicitacoes({ colaborador_id = null, status = null, limit = 200 
   return db.prepare(`
     SELECT s.*, c.nome AS colaborador_nome, c.funcao, u.name AS decidido_por_nome
     FROM escala_folga_solicitacoes s
-    JOIN colaboradores c ON c.id = s.colaborador_id
+    JOIN colaboradores c ON c.id = s.colaborador_id AND ${retencao.sqlVisibilidade(db)}
     LEFT JOIN users u ON u.id = s.decidido_por
     WHERE ${where}
     ORDER BY CASE WHEN s.status='${STATUS_PENDENTE}' THEN 0 ELSE 1 END,
@@ -114,7 +115,7 @@ function conflitoProgramadoNaData(dataISO) {
   return db.prepare(`
     SELECT f.id, f.colaborador_id, f.status, f.tipo_lancamento, c.nome AS colaborador_nome
     FROM escala_folgas_programadas f
-    JOIN colaboradores c ON c.id = f.colaborador_id
+    JOIN colaboradores c ON c.id = f.colaborador_id AND ${retencao.sqlVisibilidade(db)}
     WHERE f.status <> 'CANCELADA'
       AND f.data_folga <= ?
       AND COALESCE(f.data_fim, f.data_folga) >= ?
@@ -128,7 +129,7 @@ function conflitoAusenciaLegacy(dataISO) {
   return db.prepare(`
     SELECT a.id, a.colaborador_id, c.nome AS colaborador_nome
     FROM escala_ausencias a
-    JOIN colaboradores c ON c.id = a.colaborador_id
+    JOIN colaboradores c ON c.id = a.colaborador_id AND ${retencao.sqlVisibilidade(db)}
     WHERE a.data_inicio <= ? AND a.data_fim >= ?
     ORDER BY a.id DESC
     LIMIT 1
@@ -143,7 +144,7 @@ function conflitoSolicitacaoNaData(dataISO, ignoreSolicitacaoId = null) {
   return db.prepare(`
     SELECT s.id, s.colaborador_id, c.nome AS colaborador_nome
     FROM escala_folga_solicitacoes s
-    JOIN colaboradores c ON c.id = s.colaborador_id
+    JOIN colaboradores c ON c.id = s.colaborador_id AND ${retencao.sqlVisibilidade(db)}
     WHERE s.data_folga = ?
       AND s.status = '${STATUS_PENDENTE}'
       ${ignore}

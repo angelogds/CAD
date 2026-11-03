@@ -1,5 +1,6 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
 <% const listaColaboradores = Array.isArray(colaboradores) ? colaboradores : []; const listaOs = Array.isArray(osDisponiveis) ? osDisponiveis : []; %>
 <div class="escala-page">
   <header class="escala-head">
@@ -7,15 +8,8 @@
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
   </header>
 
-  <nav class="escala-tabs">
-    <a class="escala-tab" href="/escala">Painel da Equipe</a>
-    <a class="escala-tab" href="/escala/semana">Escala da Semana</a>
-    <a class="escala-tab" href="/escala/completa">Escala Completa</a>
-    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
-    <a class="escala-tab is-active" href="/escala/relatorios">Relatórios PDF</a>
-  </nav>
+  <%- include('_tabs',{escalaTab:'relatorios'}) %>
 
-  <div class="escala-notice">Os relatórios utilizam os dados reais já registrados no módulo. Use os filtros somente quando forem aplicáveis ao tipo escolhido; os demais podem ficar em branco.</div>
 
   <section class="escala-section">
     <div class="escala-section-head"><div><h2>Escolha o relatório</h2><p>Selecione o objetivo e, em seguida, refine o período ou colaborador.</p></div></div>
