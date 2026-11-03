@@ -1,7 +1,7 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
 <link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
-<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v2">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v3">
 <%
   const colaboradores = painel.colaboradores || [];
   const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };

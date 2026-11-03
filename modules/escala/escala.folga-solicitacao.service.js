@@ -174,9 +174,9 @@ function consultarDisponibilidadeFolga(dataISO, { ignoreSolicitacaoId = null, co
   };
 }
 
-function assertDataFolgaDisponivel(dataISO, { ignoreSolicitacaoId = null, colaboradorId = null, permitirConflitos = false } = {}) {
+function assertDataFolgaDisponivel(dataISO, { ignoreSolicitacaoId = null, colaboradorId = null, permitirConflitos = false, permitirDataPassada = false } = {}) {
   if (!dateBr.isValidISODate(dataISO)) throw new Error('Informe uma data válida para a folga.');
-  if (dataISO < dateBr.todayISO()) throw new Error('Não é possível solicitar folga em data passada.');
+  if (!permitirDataPassada && dataISO < dateBr.todayISO()) throw new Error('Não é possível solicitar folga em data passada.');
   if (dateBr.isMondayISO(dataISO)) throw new Error('Segunda-feira não está disponível para folga pelo Banco de Horas.');
 
   const disponibilidade = consultarDisponibilidadeFolga(dataISO, { ignoreSolicitacaoId, colaboradorId });
@@ -242,7 +242,10 @@ function aprovarSolicitacao(id, user, observacao = '', { autorizar_excecao = fal
       ignoreSolicitacaoId: solicitacao.id,
       colaboradorId: solicitacao.colaborador_id,
       permitirConflitos: true,
+      // A gestão pode decidir um pedido pendente depois da data original da folga.
+      permitirDataPassada: true,
     });
+    const aprovacaoPosterior = solicitacao.data_folga < dateBr.todayISO();
     const saldo = escala.calcularSaldoBancoHoras(solicitacao.colaborador_id).minutos;
     const minutosSolicitados = Number(solicitacao.minutos_solicitados || MINUTOS_DIA_FOLGA);
     assertSaldoPermiteFolga(saldo, minutosSolicitados);
@@ -263,14 +266,20 @@ function aprovarSolicitacao(id, user, observacao = '', { autorizar_excecao = fal
       motivo: solicitacao.motivo || 'Folga solicitada pelo colaborador via Banco de Horas',
       usuario: user,
     });
-    db.prepare(`
+    if (aprovacaoPosterior) escala.realizarFolgaCompensatoria(folgaId, user);
+    const observacaoDecisao = [
+      aprovacaoPosterior ? `Aprovação posterior: folga de ${dateBr.formatDateBR(solicitacao.data_folga)} confirmada como realizada.` : '',
+      String(observacao || '').trim(),
+    ].filter(Boolean).join(' ');
+    const decisao = db.prepare(`
       UPDATE escala_folga_solicitacoes
       SET status='APROVADA', folga_id=?, decidido_por=?, decidido_em=datetime('now'), observacao_decisao=?,
           exige_excecao=?, excecao_autorizada_por=?, justificativa_excecao=?, excecao_autorizada_em=?
       WHERE id=? AND status='${STATUS_PENDENTE}'
-    `).run(Number(folgaId), userId(user), String(observacao || '').trim() || null,
+    `).run(Number(folgaId), userId(user), observacaoDecisao || null,
       excecao ? 1 : 0, excecao ? userId(user) : null, excecao ? justificativa : null,
       excecao ? new Date().toISOString() : null, Number(id));
+    if (decisao.changes !== 1) throw new Error('Esta solicitação já foi analisada.');
     return folgaId;
   })();
 }
