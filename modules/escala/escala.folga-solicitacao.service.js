@@ -110,6 +110,14 @@ function listarSolicitacoes({ colaborador_id = null, status = null, limit = 200 
   });
 }
 
+function contarPendentes() {
+  if (!tableExists('escala_folga_solicitacoes')) return 0;
+  return db.prepare(`SELECT COUNT(*) total FROM escala_folga_solicitacoes s JOIN colaboradores c ON c.id=s.colaborador_id AND ${retencao.sqlVisibilidade(db)} WHERE s.status=?`).get(STATUS_PENDENTE).total;
+}
+function listarPendentesParaAprovacao({limit=6}={}) {
+  return listarSolicitacoes({status:STATUS_PENDENTE,limit}).map(s=>({...s,conflito_dia:consultarDisponibilidadeFolga(s.data_folga,{ignoreSolicitacaoId:s.id})}));
+}
+
 function conflitoProgramadoNaData(dataISO) {
   if (!tableExists('escala_folgas_programadas')) return null;
   return db.prepare(`
@@ -323,6 +331,8 @@ module.exports = {
   saldoPermiteFolga,
   getSolicitacao,
   listarSolicitacoes,
+  contarPendentes,
+  listarPendentesParaAprovacao,
   consultarDisponibilidadeFolga,
   assertDataFolgaDisponivel,
   solicitarFolga,

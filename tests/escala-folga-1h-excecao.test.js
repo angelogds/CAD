@@ -126,7 +126,7 @@ test('migration libera pedidos concorrentes, preserva auditoria e integração n
 
 test('tela e rotas expõem aviso de ocupação e confirmação da gestão, sem ampliar acesso', () => {
   const self = read('views/escala/meu-painel.ejs');
-  const manager = read('views/escala/folgas-programadas.ejs');
+  const manager = read('views/escala/folgas-programadas.ejs') + read('views/escala/_aprovacoes-folgas.ejs');
   const routes = read('modules/escala/escala.routes.js');
   assert.match(self, /ENTRADA_TARDIA/);
   assert.match(self, /SAIDA_ANTECIPADA/);

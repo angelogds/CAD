@@ -1,7 +1,7 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
 <link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
-<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v2">
 <%
   const listaFolgas = Array.isArray(folgas) ? folgas : [];
   const listaSolicitacoes = Array.isArray(solicitacoes) ? solicitacoes : [];
@@ -20,47 +20,7 @@
 
   <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente uma folga por dia é aprovada normalmente. Pedido adicional exige justificativa e autorização do encarregado, supervisor ou gestão do sistema. Entrada/saída de 1h consome 1h; meio período consome 4h; com 3h30 ou mais, a liderança pode aprovar e o saldo fica até -0h30.</div>
 
-  <section class="escala-section">
-    <div class="escala-section-head"><div><h2>Solicitações aguardando aprovação</h2><p>O saldo e a disponibilidade da data são revalidados no momento da aprovação.</p></div><span class="approval-counter"><%= pendentesFolga.length %> pendente(s)</span></div>
-    <% if(!pendentesFolga.length){ %><div class="escala-empty">Nenhuma solicitação de folga aguardando decisão.</div><% } %>
-    <div class="leave-request-grid">
-      <% pendentesFolga.forEach(s=>{ %>
-        <article class="leave-request-card">
-          <div class="approval-card-head"><div class="escala-avatar"><%= String(s.colaborador_nome||'C').charAt(0).toUpperCase() %></div><div class="approval-person"><strong><%= s.colaborador_nome %></strong><small>Solicitado em <%= dateBr.formatDateTimeBR(s.solicitado_em) %></small></div><span class="escala-status is-atestado">PENDENTE</span></div>
-          <div class="leave-date"><span>Data solicitada</span><strong><%= dateBr.formatDateBR(s.data_folga) %></strong></div>
-          <div class="approval-summary">
-            <div><span>Saldo atual</span><strong><%= fmtMin(s.saldo_atual_minutos) %></strong></div>
-            <div><span>Consumo</span><strong>-<%= fmtMin(s.minutos_solicitados) %></strong></div>
-            <div><span>Saldo previsto</span><strong><%= fmtMin(s.saldo_previsto_minutos) %></strong></div>
-            <div><span>Motivo</span><strong><%= s.motivo || 'Folga compensatória' %></strong></div>
-          </div>
-          <% if(s.conflito_dia?.ocupada){ %>
-            <div class="escala-audit-note" role="alert">
-              <strong>Atenção: já existe folga ou solicitação nesse dia.</strong>
-              <span><%= s.conflito_dia.colaboradores.join(', ') || 'Equipe de manutenção' %></span>
-              <% if(s.conflito_dia.temFolgaAprovada){ %>
-                <span>Para aprovar esta segunda folga, é obrigatória a liberação excepcional e a justificativa.</span>
-              <% } else { %>
-                <span>Há outro pedido pendente. Apenas uma solicitação pode ser aprovada normalmente para essa data.</span>
-              <% } %>
-            </div>
-          <% } %>
-          <% if(canManageEscala){ %>
-            <div class="approval-primary-actions">
-              <form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/aprovar" onsubmit="return confirm('Confirmar a aprovação desta folga?');">
-                <% if(s.conflito_dia?.temFolgaAprovada){ %>
-                  <label class="escala-field"><span class="label">Liberação excepcional</span><span><input type="checkbox" name="autorizar_excecao" value="1" required> Autorizo segunda folga nesta data</span></label>
-                  <label class="escala-field"><span class="label">Justificativa obrigatória</span><textarea class="input" name="justificativa_excecao" minlength="10" required placeholder="Explique a necessidade e a cobertura da equipe"></textarea></label>
-                <% } %>
-                <button class="btn btn-green" type="submit">Aprovar folga</button>
-              </form>
-              <details class="approval-details"><summary>Reprovar</summary><form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/reprovar"><input class="input" name="motivo" placeholder="Motivo da reprovação" required><button class="btn btn-sm" type="submit">Confirmar reprovação</button></form></details>
-            </div>
-          <% } else { %><div class="muted">Consulta somente. A decisão pertence à gestão da Manutenção.</div><% } %>
-        </article>
-      <% }) %>
-    </div>
-  </section>
+  <%- include('_aprovacoes-folgas',{pendentesFolga,canManageEscala}) %>
 
   <% if(canManageEscala){ %>
     <section class="escala-section manual-leave-section">

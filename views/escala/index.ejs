@@ -1,6 +1,7 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
-<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
+<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v2">
 <%
   const colaboradores = painel.colaboradores || [];
   const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };
@@ -19,6 +20,10 @@
     <% [{t:'Escala semanal',u:'/escala/semana'},{t:'Escala completa',u:'/escala/completa'},{t:'Registrar hora extra',u:'/escala/hora-extra/nova'}].forEach(c=>{ %><a class="escala-quick-card" href="<%=c.u%>"><strong><%=c.t%></strong><span aria-hidden="true">→</span></a><% }) %>
     <% if(typeof podeInicioFixo17!=='undefined'&&podeInicioFixo17){ %><a class="escala-quick-card" href="/escala/hora-extra/desde-17"><strong>Hora extra das 17h</strong><span aria-hidden="true">→</span></a><% } %>
   </div></section>
+
+  <% if(canManageEscala){ %>
+    <%- include('_aprovacoes-folgas',{pendentesFolga:typeof aprovacoesFolgas!=='undefined'?aprovacoesFolgas:[],totalPendentesFolga:typeof totalAprovacoesFolgas!=='undefined'?totalAprovacoesFolgas:0,tituloAprovacoes:'Aprovação de folgas',canManageEscala,voltarPara:'/escala#aprovacoes-folgas',verTodas:true}) %>
+  <% } %>
 
   <section class="escala-kpis" aria-label="Indicadores da escala">
     <div class="escala-kpi"><span>Funcionários ativos</span><strong><%= colaboradores.length %></strong></div>

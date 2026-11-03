@@ -78,8 +78,11 @@ test('fluxos existentes continuam preservados nas views modernizadas', () => {
 
   assert.match(extra, /\/escala\/hora-extra\/iniciar/);
   assert.match(extra, /action="\/escala\/hora-extra\/<%=\s*emAndamento\.id\s*%>\/finalizar"/);
-  assert.match(extra, /name="foto_inicio"/);
-  assert.match(extra, /name="foto_fim"/);
+  const foto = read('views/escala/_foto-hora-extra.ejs');
+  const ejs = require('ejs');
+  assert.match(ejs.render(foto,{contexto:'inicio',tituloFoto:'Foto inicial'}), /name="foto_inicio"/);
+  assert.match(ejs.render(foto,{contexto:'fim',tituloFoto:'Foto final'}), /name="foto_fim"/);
+  assert.match(extra, /include\('_foto-hora-extra'/);
   assert.match(extra, /name="latitude_inicio"/);
   assert.match(extra, /name="latitude_fim"/);
 

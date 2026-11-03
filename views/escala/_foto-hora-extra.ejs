@@ -1,0 +1,10 @@
+<% const campo='foto_'+contexto; %>
+<div class="escala-photo" data-photo-field>
+  <label for="<%= campo %>"><%= tituloFoto %> <span>(opcional)</span></label>
+  <input class="input" id="<%= campo %>" type="file" name="<%= campo %>" accept="image/*" capture="environment">
+  <div class="escala-photo-controls" data-photo-ui hidden>
+    <button class="btn" type="button" data-photo-open aria-controls="<%= campo %>"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h4l2-3h4l2 3h4v13H4z"/><circle cx="12" cy="13" r="4"/></svg>Adicionar foto</button>
+    <span class="escala-photo-name" data-photo-name role="status" aria-live="polite">Nenhuma foto selecionada</span>
+    <button class="btn" type="button" data-photo-clear hidden>Remover foto</button>
+  </div>
+</div>
