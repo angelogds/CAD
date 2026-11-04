@@ -57,6 +57,7 @@ router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(DIRETORI
 
 router.get("/planejamento", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamento);
 router.get("/preventivas", requireLogin, requireRole(PCM_ACCESS), ctrl.preventivas);
+router.use('/preventivas/roteiros', require('../inspecao/roteiros.routes').pcm);
 router.get("/correias", requireLogin, requireRole(PCM_ACCESS), correiasCtrl.index);
 router.post("/correias/planos", requireLogin, requireRole(PCM_MANAGE), correiasCtrl.create);
 router.get("/preventivas/nova", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.newForm);

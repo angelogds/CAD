@@ -27,6 +27,7 @@ const wrap = (fn) => (req, res, next) => {
   }
 };
 
+router.use('/roteiros', require('./roteiros.routes').operacional);
 router.get("/", requireLogin, requireRole(VIEW_ACCESS), wrap(ctrl.index));
 router.get("/:ano/:mes/os-em-andamento", requireLogin, requireRole(VIEW_ACCESS), wrap(ctrl.viewOSEmAndamento));
 router.get("/:ano/:mes", requireLogin, requireRole(VIEW_ACCESS), wrap(ctrl.viewMonth));

@@ -1,0 +1,48 @@
+<% layout('layout') %>
+<%- include('../../pcm/partials/internal-styles') %>
+<link rel="stylesheet" href="/css/roteiros-inspecao.css?v=1">
+<main class="pcm-module-page ri-page">
+  <header class="pcm-module-head">
+    <div><span class="pcm-section-label"><%= gestor ? 'PCM • Preventivas' : 'Execução de campo' %></span><h1><%= gestor ? 'Roteiros de inspeção' : 'Meu roteiro de inspeção' %></h1><p>O mecânico inspeciona e orienta. O PCM avalia, define as datas e programa os serviços necessários.</p></div>
+    <a class="pcm-button ui-btn ui-btn--outline" href="<%= gestor ? '/pcm/preventivas' : '/dashboard' %>">Voltar</a>
+  </header>
+
+  <% if (gestor) { %>
+  <section class="pcm-card">
+    <div class="pcm-card-head"><div><span class="pcm-section-label">Distribuição</span><h2>Eleger mecânico e montar roteiro</h2><p>Selecione até 150 equipamentos. A distribuição cria apenas o roteiro de inspeção.</p></div></div>
+    <form method="post" action="<%= baseUrl %>" class="ri-create">
+      <div class="pcm-form-grid">
+        <label class="pcm-field pcm-span-2">Nome do roteiro<input class="pcm-input" name="titulo" maxlength="160" required placeholder="Inspeção dos equipamentos do setor"></label>
+        <label class="pcm-field">Data da inspeção<input class="pcm-input" type="date" name="data_prevista" required></label>
+        <label class="pcm-field">Mecânico responsável<select class="pcm-input" name="responsavel_user_id" required><option value="">Selecione o mecânico</option><% mecanicos.forEach(m=>{ %><option value="<%= m.id %>"><%= m.nome %></option><% }) %></select></label>
+        <label class="pcm-field pcm-span-4">O que deve ser inspecionado<textarea class="pcm-input" name="instrucoes" maxlength="4000" rows="3" placeholder="Descreva os pontos de verificação e as orientações para este roteiro."></textarea></label>
+      </div>
+      <div class="ri-equipment-toolbar">
+        <label class="pcm-field">Localizar equipamento ou setor<input class="pcm-input" type="search" data-ri-search placeholder="Nome, código ou setor"></label>
+        <label class="ri-check"><input type="checkbox" data-ri-select-all> Selecionar equipamentos exibidos</label>
+        <span data-ri-count aria-live="polite">0 selecionados</span>
+      </div>
+      <div class="ri-equipment-list">
+        <% equipamentos.forEach(e=>{ %>
+        <label class="ri-equipment" data-ri-equipment data-search="<%= [e.nome,e.codigo,e.setor].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR') %>">
+          <input type="checkbox" name="equipamento_ids" value="<%= e.id %>">
+          <span><strong><%= e.nome %></strong><small><%= e.codigo || 'Sem código' %> • <%= e.setor || 'Setor não informado' %></small></span>
+        </label>
+        <% }) %>
+        <% if (!equipamentos.length) { %><p class="pcm-empty-row">Nenhum equipamento ativo cadastrado.</p><% } %>
+      </div>
+      <% if (!mecanicos.length) { %><p class="ri-notice">Cadastre um usuário MECANICO ativo e vinculado a um colaborador ativo antes de distribuir o roteiro.</p><% } %>
+      <button type="submit" class="pcm-button primary ui-btn ui-btn--primary" <%= !mecanicos.length || !equipamentos.length ? 'disabled' : '' %>>Distribuir roteiro</button>
+    </form>
+  </section>
+  <% } %>
+
+  <section class="pcm-card">
+    <div class="pcm-card-head"><div><span class="pcm-section-label"><%= gestor ? 'Acompanhamento e programação' : 'Meus equipamentos' %></span><h2><%= gestor ? 'Roteiros distribuídos' : 'Roteiros atribuídos a você' %></h2></div></div>
+    <div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>Roteiro</th><th>Data</th><th>Mecânico</th><th>Inspecionados</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+      <% roteiros.forEach(r=>{ %><tr><td><strong>#<%= r.id %> • <%= r.titulo %></strong></td><td><%= r.data_prevista.split('-').reverse().join('/') %></td><td><%= r.responsavel_nome %></td><td><%= r.inspecionados %> / <%= r.total %></td><td><span class="pcm-badge <%= r.status==='ENVIADO_PCM'?'warn':'info' %>"><%= {ABERTO:'Em inspeção',ENVIADO_PCM:'Aguardando PCM',CONCLUIDO:'Concluído'}[r.status] %></span><% if (r.status==='ENVIADO_PCM' && r.pendentes_pcm) { %><small><%= r.pendentes_pcm %> equipamento(s) para avaliar</small><% } %></td><td><a class="pcm-button small ui-btn ui-btn--outline" href="<%= baseUrl %>/<%= r.id %>"><%= gestor ? 'Analisar roteiro' : 'Abrir roteiro' %></a></td></tr><% }) %>
+      <% if (!roteiros.length) { %><tr><td colspan="6" class="pcm-empty-row"><%= gestor ? 'Nenhum roteiro distribuído.' : 'Nenhum roteiro atribuído a você pelo PCM.' %></td></tr><% } %>
+    </tbody></table></div>
+  </section>
+</main>
+<script src="/js/roteiros-inspecao.js?v=1" defer></script>

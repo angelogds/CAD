@@ -1649,6 +1649,7 @@ module.exports = {
   addComponenteBOM,
   addPontoLubrificacao,
   listMecanicosLubrificacao,
+  listEquipamentosRoteiroBase,
   gerarRoteiroBaseLubrificacao,
   listMotoresLubrificacaoPendentes,
   listRotasLubrificacao,
