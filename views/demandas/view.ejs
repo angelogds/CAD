@@ -16,6 +16,9 @@
   const approvalLabel = value => ({ PENDENTE: 'Pendente', APROVADA: 'Aprovada', REPROVADA: 'Reprovada' }[value] || value || 'Pendente');
   const slug = value => String(value || '').toLowerCase().replace(/_/g, '-');
   const isFinished = ['CONCLUIDA', 'CANCELADA'].includes(demanda.status);
+  const canAgenda = canAccessModule(normalizeRole(user?.role), 'agenda_servicos_view');
+  const canPcmAgenda = canAccessModule(normalizeRole(user?.role), 'pcm_manage');
+  const eventosAgenda = typeof agendaDemanda !== 'undefined' ? agendaDemanda : [];
   const canOpen = canAccessModule(normalizeRole(user?.role), 'demandas_open');
   const canManage = canAccessModule(normalizeRole(user?.role), 'demandas_manage');
   const canMaterials = canAccessModule(normalizeRole(user?.role), 'demandas_materials');
@@ -127,6 +130,15 @@
           <div><small>Prazo</small><strong><%= demanda.prazo_previsto ? fmtBR(demanda.prazo_previsto) : 'A definir' %></strong></div>
         </div>
       </section>
+
+      <% if (canAgenda) { %>
+      <section class="demand-card demand-agenda-card">
+        <div class="section-heading"><div><h2>Agenda de serviços e instalações</h2><p><%= Number(demanda.requer_instalacao) === 1 ? 'Fabricação com instalação posterior. O PCM programa a instalação depois da conclusão desta demanda.' : 'Acompanhe a programação desta demanda no PCM.' %></p></div><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="<%= canPcmAgenda ? '/pcm/programacao-semanal?busca=' + demanda.id + '#fila-demandas' : '/pcm/agenda?busca=' + demanda.id %>"><%= canPcmAgenda ? 'Programar no PCM' : 'Consultar agenda' %></a></div>
+        <% if (!eventosAgenda.length) { %><p class="muted">Esta demanda ainda não tem serviço ou instalação programados.</p><% } %>
+        <% eventosAgenda.forEach(evento => { %><div class="demand-agenda-line"><strong><%= evento.etapa === 'INSTALACAO' ? 'Instalação' : 'Serviço' %> · <%= fmtBR(evento.data_programada) %><%= evento.horario ? ' às ' + evento.horario : '' %></strong><span><%= evento.responsavel %> · <%= evento.local_servico %> · <%= statusLabel(evento.status) %></span><% if (evento.data_realizada) { %><span>Realizado em <%= fmtBR(evento.data_realizada) %></span><% } %></div><% }) %>
+        <% if (canPcmAgenda && demanda.status !== 'CANCELADA') { %><form method="POST" action="/pcm/programacao-semanal/demandas/<%= demanda.id %>/instalacao" class="demand-agenda-flag"><label><input type="checkbox" name="requer_instalacao" value="1" <%= Number(demanda.requer_instalacao) === 1 ? 'checked' : '' %>> Exige instalação posterior</label><button class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" type="submit">Salvar etapa de instalação</button></form><% } %>
+      </section>
+      <% } %>
 
       <div class="demand-detail-grid demand-detail-grid-clean">
         <section class="demand-card demand-description-card">

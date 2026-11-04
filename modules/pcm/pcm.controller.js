@@ -234,6 +234,7 @@ function pecasCriticas(req, res) {
 }
 
 function programacaoSemanal(req, res) {
+  const agenda = require('./pcm.agenda.controller').viewData(req);
   const filtros = {
     semana: req.query.semana || "",
     responsavel: req.query.responsavel || "",
@@ -242,7 +243,7 @@ function programacaoSemanal(req, res) {
     criticidade: req.query.criticidade || "",
   };
 
-  const programacao = operationalService.getWeeklySchedule({ semana_inicio: filtros.semana || req.query.semana_inicio });
+  const programacao = operationalService.getWeeklySchedule({ semana_inicio: agenda.semanaAgenda.semana_inicio });
   const programadas = new Set(programacao.itens.map((item) => Number(item.os_id)));
   const atividadesSemProgramacao = service.listBacklogSimples().filter((b) => !programadas.has(Number(b.id))).slice(0, 20).map((b) => ({
     id: b.id,
@@ -256,6 +257,8 @@ function programacaoSemanal(req, res) {
 
   return res.render("pcm/programacao-semanal", {
     ...baseView(req),
+    ...agenda,
+    title: 'Agenda de serviços e instalações • PCM',
     activePcmSection: "programacao-semanal",
     filtros,
     programacao,

@@ -54,6 +54,7 @@ function create(req, res) {
       nr_referencia: req.body.nr_referencia,
       prazo_previsto: req.body.prazo_previsto,
       custo_servicos_estimado: req.body.custo_servicos_estimado,
+      requer_instalacao: req.body.requer_instalacao || '0',
     }, req.session?.user || {});
     req.flash('success', `Demanda #${id} criada.`);
     return res.redirect(`/demandas/${id}`);
@@ -99,6 +100,7 @@ function updateDetails(req, res) {
       nr_referencia: req.body.nr_referencia,
       prazo_previsto: req.body.prazo_previsto,
       custo_servicos_estimado: req.body.custo_servicos_estimado,
+      requer_instalacao: req.body.requer_instalacao || '0',
       user_id: req.session?.user?.id || null,
       user_role: req.session?.user?.role || null,
     });
@@ -148,6 +150,7 @@ function show(req, res) {
     responsaveis: service.listResponsaveis(),
     equipamentos: service.listEquipamentos(),
     estoqueItens: solicitacoesService.listEstoqueItens(),
+    agendaDemanda: require('../pcm/pcm.agenda.service').historicoDemanda(id),
   });
 }
 

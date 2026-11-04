@@ -345,30 +345,35 @@ function create(data = {}, user = {}) {
     throw new Error('Equipamento selecionado não foi encontrado.');
   }
 
-  const info = db.prepare(`
-    INSERT INTO demandas (
-      titulo, descricao, prioridade, status, created_by, demanda_pai_id, equipamento_id,
-      categoria, setor_origem, nr_referencia, prazo_previsto, custo_servicos_estimado,
-      aprovacao_status, created_at, updated_at
-    ) VALUES (?, ?, ?, 'NOVA', ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', datetime('now'), datetime('now'))
-  `).run(
-    title,
-    data.descricao || null,
-    String(data.prioridade || 'NORMAL').toUpperCase(),
-    Number(user.id || data.created_by || 0),
-    parentId,
-    equipamentoId,
-    categoria,
-    String(data.setor_origem || '').trim() || null,
-    String(data.nr_referencia || '').trim() || null,
-    String(data.prazo_previsto || '').trim() || null,
-    Math.max(0, Number(data.custo_servicos_estimado || 0))
-  );
+  return db.transaction(() => {
+    const info = db.prepare(`
+      INSERT INTO demandas (
+        titulo, descricao, prioridade, status, created_by, demanda_pai_id, equipamento_id,
+        categoria, setor_origem, nr_referencia, prazo_previsto, custo_servicos_estimado,
+        aprovacao_status, created_at, updated_at
+      ) VALUES (?, ?, ?, 'NOVA', ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', datetime('now'), datetime('now'))
+    `).run(
+      title,
+      data.descricao || null,
+      String(data.prioridade || 'NORMAL').toUpperCase(),
+      Number(user.id || data.created_by || 0),
+      parentId,
+      equipamentoId,
+      categoria,
+      String(data.setor_origem || '').trim() || null,
+      String(data.nr_referencia || '').trim() || null,
+      String(data.prazo_previsto || '').trim() || null,
+      Math.max(0, Number(data.custo_servicos_estimado || 0))
+    );
 
-  const id = Number(info.lastInsertRowid);
-  db.prepare(`INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at) VALUES (?, ?, ?, datetime('now'))`)
-    .run(id, user.id || null, parentId ? `Subdemanda criada vinculada à demanda #${parentId}` : 'Demanda criada');
-  return id;
+    const id = Number(info.lastInsertRowid);
+    if (hasColumn('demandas', 'requer_instalacao')) {
+      db.prepare('UPDATE demandas SET requer_instalacao=? WHERE id=?').run(String(data.requer_instalacao || '') === '1' ? 1 : 0, id);
+    }
+    db.prepare(`INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at) VALUES (?, ?, ?, datetime('now'))`)
+      .run(id, user.id || null, parentId ? `Subdemanda criada vinculada à demanda #${parentId}` : 'Demanda criada');
+    return id;
+  })();
 }
 
 function updateDetails(id, data = {}) {
@@ -404,6 +409,13 @@ function updateDetails(id, data = {}) {
   }
 
   db.transaction(() => {
+    if (hasColumn('demandas', 'requer_instalacao') && data.requer_instalacao !== undefined) {
+      const flag = String(data.requer_instalacao) === '1' ? 1 : 0;
+      if (!flag && tableExists('pcm_programacao_demandas') && db.prepare("SELECT 1 FROM pcm_programacao_demandas WHERE demanda_id=? AND etapa='INSTALACAO' AND status<>'CANCELADA'").get(id)) {
+        throw new Error('Já existe uma instalação vinculada a esta fabricação.');
+      }
+      db.prepare('UPDATE demandas SET requer_instalacao=? WHERE id=?').run(flag, id);
+    }
     db.prepare(`
       UPDATE demandas
       SET titulo=?, descricao=?, prioridade=?, equipamento_id=?, categoria=?,
@@ -448,6 +460,9 @@ function remove(id, { user_id = null, user_role = null } = {}) {
   if (Array.isArray(current.ordens) && current.ordens.length) {
     throw new Error('Não é possível apagar esta demanda porque já existe Ordem de Serviço vinculada.');
   }
+  if (tableExists('pcm_programacao_demandas') && db.prepare('SELECT 1 FROM pcm_programacao_demandas WHERE demanda_id=?').get(id)) {
+    throw new Error('Esta demanda possui histórico na agenda do PCM e deve ser preservada.');
+  }
   if (String(current.status || '').toUpperCase() === 'EM_ANDAMENTO') {
     throw new Error('Não é possível apagar uma demanda em andamento. Interrompa ou cancele o fluxo antes de excluir.');
   }
@@ -480,16 +495,19 @@ function updateStatus(id, { status, responsavel_user_id, user_id }) {
   if (st === 'EM_ANDAMENTO' && !startedAt) startedAt = new Date().toISOString();
   if (st === 'CONCLUIDA' && !finishedAt) finishedAt = new Date().toISOString();
 
-  db.prepare(`
-    UPDATE demandas
-    SET status=?, responsavel_user_id=?, started_at=?, finished_at=?, updated_at=datetime('now')
-    WHERE id=?
-  `).run(st, responsavel_user_id ? Number(responsavel_user_id) : null, startedAt, finishedAt, id);
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE demandas
+      SET status=?, responsavel_user_id=?, started_at=?, finished_at=?, updated_at=datetime('now')
+      WHERE id=?
+    `).run(st, responsavel_user_id ? Number(responsavel_user_id) : null, startedAt, finishedAt, id);
 
-  db.prepare(`
-    INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at)
-    VALUES (?, ?, ?, datetime('now'))
-  `).run(id, user_id || null, `Status atualizado para ${st}`);
+    db.prepare(`
+      INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at)
+      VALUES (?, ?, ?, datetime('now'))
+    `).run(id, user_id || null, `Status atualizado para ${st}`);
+    require('../pcm/pcm.agenda.service').aoAtualizarStatusDemanda(id, st, user_id);
+  })();
 }
 
 function materiaisDisponiveisParaExecucao(demanda) {

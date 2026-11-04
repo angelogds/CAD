@@ -1,0 +1,11 @@
+<form class="pcm-agenda-form" method="POST" action="/pcm/programacao-semanal/demandas/<%= demandaAgenda.demanda_id || demandaAgenda.id %>/programar" data-pcm-loading>
+  <input type="hidden" name="etapa" value="<%= demandaAgenda.etapa %>">
+  <input type="hidden" name="semana_inicio" value="<%= semanaInicio %>">
+  <label>Data programada<input name="data_programada" type="date" value="<%= demandaAgenda.data_programada || semanaInicio %>" required></label>
+  <label>Horário <span class="muted">(opcional)</span><input name="horario" type="time" value="<%= demandaAgenda.horario || '' %>"></label>
+  <label class="pcm-agenda-form-wide">Mecânico responsável<select name="responsavel_user_id" required><option value="">Selecione o responsável</option><% equipe.forEach(person => { %><option value="<%= person.id %>" <%= Number(demandaAgenda.responsavel_user_id) === person.id ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
+  <label>Previsão de horas<input name="horas_estimadas" type="number" min="0.5" max="72" step="0.5" value="<%= demandaAgenda.horas_estimadas || 2 %>" required></label>
+  <label class="pcm-agenda-form-wide">Local do serviço ou instalação<input name="local_servico" maxlength="180" value="<%= demandaAgenda.local_servico || demandaAgenda.setor_origem || '' %>" placeholder="Setor e ponto onde a equipe vai atuar" required></label>
+  <label class="pcm-agenda-form-full">Preparação e materiais <span class="muted">(opcional)</span><textarea name="preparacao" maxlength="2000" rows="2" placeholder="Materiais a separar, acesso ao local e apoio necessário"><%= demandaAgenda.preparacao || '' %></textarea></label>
+  <div class="pcm-agenda-form-full pcm-agenda-form-footer"><span>O aviso ficará disponível nos perfis envolvidos, incluindo o almoxarifado.</span><button class="pcm-op-btn ui-btn ui-btn--primary" type="submit"><%= demandaAgenda.data_programada ? 'Salvar e avisar' : 'Programar e avisar' %></button></div>
+</form>

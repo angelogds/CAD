@@ -1,0 +1,21 @@
+.agenda-bell-label{font-size:12px;font-weight:650}
+.agenda-notification-dropdown{width:min(390px,calc(100vw - 24px));max-height:70vh;overflow-y:auto;overscroll-behavior:contain}
+.agenda-notification-head{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 14px;border-bottom:1px solid #e0e9e3;font-size:13px}
+.agenda-notification-head a{color:#126b43;font-size:12px}
+.agenda-notification-message{display:block;white-space:pre-line;overflow-wrap:anywhere;color:#53685b;font-size:12px;line-height:1.6;margin-top:6px}
+.agenda-notification-dropdown>form{border-top:1px solid #e0e9e3;padding:8px}
+.demand-installation-check{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:12px;padding:16px;border:1px solid #cee0d3;border-radius:12px;background:#f5faf7;cursor:pointer}
+.demand-installation-check>input{width:18px!important;height:18px;min-height:18px;margin:3px 0;flex-shrink:0;accent-color:#126b43}
+.demand-installation-check>span{display:grid;gap:5px}
+.demand-installation-check small{line-height:1.6}
+.demand-agenda-card{margin-bottom:20px}
+.demand-agenda-card .section-heading{flex-wrap:wrap;gap:14px}
+.demand-agenda-line{display:grid;gap:4px;padding:13px 0;border-top:1px solid #e0e9e3;font-size:13px}
+.demand-agenda-line>span{font-size:12px;color:#53685b}
+.demand-agenda-flag{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid #e0e9e3;padding-top:16px;margin-top:12px}
+.demand-agenda-flag label{display:flex;align-items:center;gap:8px;font-size:13px}
+.demand-agenda-flag input{accent-color:#126b43;width:17px;height:17px}
+@media(max-width:600px){.agenda-bell .topbar-notification-dropdown{position:fixed;top:70px;right:12px;left:auto}.demand-agenda-flag{align-items:stretch;flex-direction:column}.demand-agenda-card .section-heading>a{width:100%}}
+.agenda-bell{flex:0 0 auto}
+.agenda-bell .topbar-notification{white-space:nowrap}
+@media(max-width:600px){.agenda-bell .agenda-bell-label{display:none}.agenda-bell .topbar-notification:before{content:'▦';font-size:17px}.agenda-bell .topbar-notification{min-width:42px;padding-left:6px;padding-right:6px;gap:2px}}
