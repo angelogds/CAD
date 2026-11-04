@@ -13,6 +13,8 @@ Documento curto da fase de estabilização técnica para reduzir ambiguidade de 
 - Almoxarifado: `/almoxarifado`
 - Estoque: `/estoque`
 - PCM: `/pcm`
+- Roteiro de inspeção do mecânico: `/inspecao/roteiros` (antes das rotas de relatório `/:ano/:mes`).
+- Gestão e programação dos roteiros no PCM: `/pcm/preventivas/roteiros`.
 
 Fonte central: `config/routes.js`.
 

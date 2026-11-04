@@ -71,6 +71,7 @@
     <% if (canOSChat) { %><%- navItem('/chat-os', 'Chat de OS', activeMenu === 'os-chat', '', badge(counters.osChatNaoLidas || 0, 'green')) %><% } %>
     <% if (canPreventivas) { %><%- navItem('/preventivas', 'Preventivas', activeMenu === 'preventivas', '', badge(counters.preventivasHoje, 'blue')) %><% } %>
     <% if (canLubrificacaoExecucao) { %><%- navItem('/lubrificacao', 'Roteiro de Lubrificação', activeMenu === 'lubrificacao') %><% } %>
+    <% if (role === 'MECANICO') { %><%- navItem('/inspecao/roteiros', 'Roteiro de inspeção', activeMenu === 'roteiro-inspecao') %><% } %>
     <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
     <% if (canSolicitacoes && !isCompras) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
     <% if (canAcompanhamentoOnly) { %><%- navItem('/acompanhamento-compras', 'Acompanhamento de Compras', activeMenu === 'solicitacoes') %><% } %>

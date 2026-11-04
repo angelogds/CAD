@@ -161,6 +161,8 @@ app.locals.incluir = function (p) {
 // O parser JSON precisa estar disponível antes do webhook POST da Meta.
 // O webhook do WhatsApp fica antes de sessão/login/CSRF/proteções de rotas.
 app.use(express.json({ limit: "2mb" }));
+// O formulário do roteiro reúne os pareceres dos equipamentos em um único envio.
+app.use(['/inspecao/roteiros', '/inspection/roteiros', '/pcm/preventivas/roteiros'], express.urlencoded({ extended: false, limit: '4mb', parameterLimit: 2000 }));
 app.use(express.urlencoded({ extended: false }));
 
 // ===== Webhooks públicos =====

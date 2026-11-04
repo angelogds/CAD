@@ -12,6 +12,7 @@
       <a class="pcm-button ui-btn ui-btn--outline" href="/preventivas">Ver operação</a>
       <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/preventivas/programadas">Programação</a>
       <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/preventivas/eleger-mecanico">Responsáveis</a>
+      <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/preventivas/roteiros">Roteiros de inspeção</a>
       <a class="pcm-button primary ui-btn ui-btn--primary" href="/pcm/preventivas/nova">+ Nova preventiva</a>
     </div>
   </header>
@@ -60,6 +61,7 @@
       <% } %>
 
       <section class="pcm-split">
+        <article class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Inspeção dos equipamentos</span><h2>Roteiros de inspeção</h2></div></div><p>Eleja um mecânico para inspecionar os equipamentos. Receba as orientações e defina no PCM as datas e os responsáveis pelas preventivas e corretivas necessárias.</p><div class="pcm-inline-actions"><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/pcm/preventivas/roteiros">Distribuir e analisar roteiros</a></div></article>
         <article class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Equipe padrão</span><h2>Responsáveis das preventivas</h2></div></div><p><%= configResponsaveis?.mecanico_1_nome || 'Não definido' %><%= configResponsaveis?.mecanico_2_nome ? (' e '+configResponsaveis.mecanico_2_nome) : '' %></p><div class="pcm-inline-actions"><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/pcm/preventivas/eleger-mecanico">Configurar equipe</a></div></article>
         <article class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Execução</span><h2>Central do mecânico</h2></div></div><p>A baixa e o fechamento técnico são feitos no módulo operacional, somente pelo responsável atribuído.</p><div class="pcm-inline-actions"><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/preventivas">Abrir Preventivas</a></div></article>
       </section>

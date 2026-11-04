@@ -1,0 +1,71 @@
+<% layout('layout') %>
+<%- include('../../pcm/partials/internal-styles') %>
+<link rel="stylesheet" href="/css/roteiros-inspecao.css?v=1">
+<%
+ const estados={ABERTO:'Em inspeção',ENVIADO_PCM:'Aguardando análise do PCM',CONCLUIDO:'Concluído'};
+ const resultados=[['SEM_NECESSIDADE','Sem necessidade de manutenção identificada'],['PREVENTIVA','Necessita preventiva'],['CORRETIVA','Necessita corretiva'],['AMBAS','Necessita preventiva e corretiva']];
+ const prioridades=[['BAIXA','Baixa'],['MEDIA','Média'],['ALTA','Alta'],['CRITICA','Crítica']];
+%>
+<main class="pcm-module-page ri-page">
+  <header class="pcm-module-head">
+    <div><span class="pcm-section-label">Roteiro de inspeção #<%= roteiro.id %></span><h1><%= roteiro.titulo %></h1><p><%= roteiro.responsavel_nome %> • Previsto para <%= roteiro.data_prevista.split('-').reverse().join('/') %></p></div>
+    <a class="pcm-button ui-btn ui-btn--outline" href="<%= baseUrl %>">Voltar aos roteiros</a>
+  </header>
+  <section class="pcm-card ri-summary">
+    <div><span class="pcm-badge info"><%= estados[roteiro.status] %></span><strong><%= roteiro.inspecionados %> de <%= roteiro.total %> equipamentos inspecionados</strong></div>
+    <% if (roteiro.instrucoes) { %><p class="ri-text"><%= roteiro.instrucoes %></p><% } %>
+    <p>Registre a condição encontrada e indique os serviços necessários. O PCM define as datas, o responsável pela execução e a abertura das OS.</p>
+    <% if (typeof erroForm !== 'undefined' && erroForm) { %><p class="ri-notice" role="alert"><%= erroForm %></p><% } %>
+  </section>
+
+  <% if (podeRegistrar) { %><form id="ri-results" method="post" action="<%= baseUrl %>/<%= roteiro.id %>/registrar"></form><% } %>
+  <% roteiro.itens.forEach((item,idx)=>{ %>
+  <section class="pcm-card ri-item" id="item-<%= item.id %>">
+    <div class="pcm-card-head"><div><span class="pcm-section-label">Equipamento <%= idx+1 %> • <%= item.setor || 'Setor não informado' %></span><h2><%= item.equipamento_nome %></h2><p><%= item.equipamento_codigo || ('Cadastro #'+item.equipamento_id) %></p></div><span class="pcm-badge <%= item.inspecionado_em?'info':'warn' %>"><%= item.inspecionado_em ? 'Inspeção registrada' : 'A inspecionar' %></span></div>
+    <% if (podeRegistrar) { %>
+    <div class="ri-record" data-ri-record>
+      <input type="hidden" form="ri-results" name="item_ids" value="<%= item.id %>">
+      <div class="pcm-form-grid">
+        <label class="pcm-field pcm-span-2">Resultado da inspeção<select class="pcm-input" form="ri-results" name="resultado_<%= item.id %>" data-ri-result><option value="">Ainda não inspecionado</option><% resultados.forEach(([v,l])=>{ %><option value="<%= v %>" <%= item.resultado===v?'selected':'' %>><%= l %></option><% }) %></select></label>
+        <label class="pcm-field pcm-span-2">Prioridade sugerida ao PCM<select class="pcm-input" form="ri-results" name="prioridade_<%= item.id %>"><% prioridades.forEach(([v,l])=>{ %><option value="<%= v %>" <%= item.prioridade_sugerida===v?'selected':'' %>><%= l %></option><% }) %></select></label>
+        <label class="pcm-field pcm-span-4" data-ri-kind="PREVENTIVA">O que precisa de preventiva<textarea class="pcm-input" form="ri-results" name="preventiva_<%= item.id %>" maxlength="4000" rows="3"><%= item.orientacao_preventiva || '' %></textarea></label>
+        <label class="pcm-field pcm-span-4" data-ri-kind="CORRETIVA">O que precisa de corretiva<textarea class="pcm-input" form="ri-results" name="corretiva_<%= item.id %>" maxlength="4000" rows="3"><%= item.orientacao_corretiva || '' %></textarea></label>
+        <label class="pcm-field pcm-span-4">Condição observada e orientação do mecânico<textarea class="pcm-input" form="ri-results" name="observacao_<%= item.id %>" maxlength="4000" rows="3"><%= item.observacao || '' %></textarea></label>
+      </div>
+    </div>
+    <% } else { %>
+      <p><strong><%= resultados.find(([v])=>v===item.resultado)?.[1] || 'Ainda não inspecionado' %></strong> • Prioridade sugerida: <%= prioridades.find(([v])=>v===item.prioridade_sugerida)?.[1] || '-' %></p>
+      <% if (item.observacao) { %><p class="ri-text"><%= item.observacao %></p><% } %>
+      <% if (item.inspecionado_em) { %><small>Registro da inspeção: <%= dateBr.formatDateTimeBR(item.inspecionado_em) %></small><% } %>
+      <% ['PREVENTIVA','CORRETIVA'].filter(tipo=>item.resultado===tipo||item.resultado==='AMBAS').forEach(tipo=>{ const prefix=tipo.toLowerCase(); %>
+      <div class="ri-recommendation">
+        <h3><%= tipo==='PREVENTIVA'?'Preventiva indicada':'Corretiva indicada' %></h3><p class="ri-text"><%= item['orientacao_'+prefix] %></p>
+        <% if (item[prefix+'_decisao']==='PROGRAMADA') { %>
+          <p><a href="/os/<%= item[prefix+'_os_id'] %>">OS #<%= item[prefix+'_os_id'] %></a> • Programada para <%= item[prefix+'_data'].split('-').reverse().join('/') %> • <%= item[prefix+'_responsavel_nome'] %></p>
+          <% if (item[prefix+'_parecer']) { %><p class="ri-text">Parecer do PCM: <%= item[prefix+'_parecer'] %></p><% } %>
+        <% } else if (item[prefix+'_decisao']==='DISPENSADA') { %>
+          <p class="ri-text"><strong>Não programada pelo PCM:</strong> <%= item[prefix+'_parecer'] %></p>
+        <% } else if (gestor && roteiro.status==='ENVIADO_PCM') { %>
+          <form method="post" action="<%= baseUrl %>/<%= roteiro.id %>/itens/<%= item.id %>/programar" class="pcm-form-grid">
+            <input type="hidden" name="tipo" value="<%= tipo %>">
+            <label class="pcm-field">Data do serviço<input class="pcm-input" type="date" name="data_programada" required></label>
+            <label class="pcm-field">Mecânico executor<select class="pcm-input" name="responsavel_user_id" required><option value="">Selecione</option><% mecanicos.forEach(m=>{ %><option value="<%= m.id %>"><%= m.nome %></option><% }) %></select></label>
+            <label class="pcm-field">Prioridade definida pelo PCM<select class="pcm-input" name="prioridade"><% prioridades.forEach(([v,l])=>{ %><option value="<%= v %>" <%= item.prioridade_sugerida===v?'selected':'' %>><%= l %></option><% }) %></select></label>
+            <label class="pcm-field pcm-span-4">Parecer do PCM<textarea class="pcm-input" name="parecer" maxlength="4000" rows="2" placeholder="Justificativa obrigatória caso decida não programar."></textarea></label>
+            <div class="pcm-span-4 pcm-inline-actions"><button class="pcm-button primary ui-btn ui-btn--primary" name="decisao" value="PROGRAMADA">Programar <%= prefix %> e gerar OS</button><button class="pcm-button ui-btn ui-btn--outline" name="decisao" value="DISPENSADA" formnovalidate>Não programar, com justificativa</button></div>
+          </form>
+        <% } else { %><span class="pcm-badge warn">Aguardando <%= roteiro.status==='ABERTO'?'envio ao PCM':'programação do PCM' %></span><% } %>
+      </div>
+      <% }) %>
+    <% } %>
+  </section>
+  <% }) %>
+
+  <% if (podeRegistrar) { %>
+  <footer class="pcm-card ri-footer"><p>Você pode salvar parcialmente e continuar depois. Envie ao PCM quando todos os equipamentos estiverem inspecionados.</p><div class="pcm-inline-actions"><button class="pcm-button ui-btn ui-btn--outline" form="ri-results" name="acao" value="salvar">Salvar inspeções</button><button class="pcm-button primary ui-btn ui-btn--primary" form="ri-results" name="acao" value="enviar">Enviar roteiro ao PCM</button></div></footer>
+  <% } %>
+  <% if (gestor && roteiro.status==='ENVIADO_PCM') { %>
+  <section class="pcm-card"><h2>Concluir análise do roteiro</h2><p>Avalie todas as indicações antes de concluir. As OS programadas continuarão abertas até a execução dos serviços.</p><form method="post" action="<%= baseUrl %>/<%= roteiro.id %>/concluir" onsubmit="return confirm('Concluir a análise de todo o roteiro? As OS continuarão no fluxo de execução.');"><button class="pcm-button primary ui-btn ui-btn--primary">Concluir roteiro</button></form></section>
+  <% } %>
+</main>
+<script src="/js/roteiros-inspecao.js?v=1" defer></script>
