@@ -1,46 +1,67 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
 <%
-  const weekdays = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
-  const formatDate = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR') : '-';
-  const byDay = new Map();
-  (programacao.dias || []).forEach((day) => byDay.set(day, []));
-  (programacao.itens || []).forEach((item) => { if (byDay.has(item.data_programada)) byDay.get(item.data_programada).push(item); });
-  const previous = new Date(`${programacao.semana_inicio}T12:00:00`); previous.setDate(previous.getDate()-7);
-  const next = new Date(`${programacao.semana_inicio}T12:00:00`); next.setDate(next.getDate()+7);
+  const shared = typeof compartilhada !== 'undefined' && compartilhada;
+  const eventos = typeof agendaEventos !== 'undefined' ? agendaEventos : [];
+  const pendentes = typeof demandasPendentes !== 'undefined' ? demandasPendentes : [];
+  const equipe = typeof equipeAgenda !== 'undefined' ? equipeAgenda : (programacao.mecanicos || []);
+  const filtrosAgenda = typeof agendaFiltros !== 'undefined' ? agendaFiltros : {};
+  const hoje = typeof hojeAgenda !== 'undefined' ? hojeAgenda : new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
+  const rotulos = { PROGRAMADA: 'Programada', EM_ANDAMENTO: 'Em andamento', CONCLUIDA: 'Concluída', CANCELADA: 'Cancelada' };
+  const weekdays = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+  const formatDate = value => value ? new Date(`${value}T12:00:00Z`).toLocaleDateString('pt-BR', {timeZone:'UTC'}) : '—';
+  const podeVerDemandas = typeof canAccessModule === 'function' && canAccessModule(user.role, 'demandas_view');
+  const basePath = shared ? '/pcm/agenda' : '/pcm/programacao-semanal';
+  const weekUrl = date => {
+    const query = new URLSearchParams({semana_inicio: date});
+    Object.entries(filtrosAgenda).forEach(([key,value]) => { if (value) query.set(key,value); });
+    return `${basePath}?${query}`;
+  };
+  const byDay = new Map((programacao.dias || []).map(day => [day, []]));
+  eventos.forEach(item => { if (byDay.has(item.data_programada)) byDay.get(item.data_programada).push(item); });
+  const ordens = !shared && (!filtrosAgenda.origem || filtrosAgenda.origem === 'OS') ? (programacao.itens || []).filter(item =>
+    (!filtrosAgenda.responsavel || String(item.responsavel_user_id) === filtrosAgenda.responsavel) &&
+    (!filtrosAgenda.status || item.status === filtrosAgenda.status) &&
+    (!filtrosAgenda.busca || `${item.os_id} ${item.equipamento || ''}`.toLowerCase().includes(filtrosAgenda.busca.toLowerCase()))) : [];
+  ordens.forEach(item => { if (byDay.has(item.data_programada)) byDay.get(item.data_programada).push({...item, origemOS:true}); });
+  const previous = new Date(`${programacao.semana_inicio}T12:00:00Z`); previous.setUTCDate(previous.getUTCDate()-7);
+  const next = new Date(`${programacao.semana_inicio}T12:00:00Z`); next.setUTCDate(next.getUTCDate()+7);
+  const carga = eventos.filter(item => item.status !== 'CANCELADA').concat(ordens);
+  const realizadas = eventos.filter(item => item.status === 'CONCLUIDA').length;
+  const atrasadas = eventos.filter(item => item.data_programada < hoje && ['PROGRAMADA','EM_ANDAMENTO'].includes(item.status)).length;
 %>
-<div class="pcm-op-page">
-  <header class="pcm-op-head"><div><span class="pcm-op-eyebrow">Planejamento de curto prazo</span><h1>Programação semanal</h1><p>Agenda real da equipe e fila de OS ainda sem programação, reunidas em uma única tela.</p></div><div class="pcm-op-head-actions"><% if (!canManagePcm) { %><span class="pcm-readonly">Modo consulta</span><% } %><a class="pcm-op-btn ui-btn ui-btn--outline" href="/pcm">Voltar à visão geral</a></div></header>
+<div class="pcm-op-page pcm-agenda-page">
+  <header class="pcm-op-head"><div><span class="pcm-op-eyebrow"><%= shared ? 'Reciclagem · programação compartilhada' : 'PCM · planejamento de curto prazo' %></span><h1>Agenda de serviços e instalações</h1><p><%= shared ? 'Datas, responsáveis e preparação para os próximos serviços da equipe.' : 'Programe as demandas da semana e organize a instalação das fabricações concluídas.' %></p></div><div class="pcm-op-head-actions"><% if (shared) { %><% if (typeof canAccessModule === 'function' && canAccessModule(user.role,'pcm')) { %><a class="pcm-op-btn ui-btn ui-btn--primary" href="/pcm/programacao-semanal">Gerenciar no PCM</a><% } %><% } else { %><% if (canManagePcm) { %><a class="pcm-op-btn ui-btn ui-btn--primary" href="#fila-demandas">Programar demanda</a><% } %><a class="pcm-op-btn ui-btn ui-btn--outline" href="/demandas">Ver demandas</a><a class="pcm-op-btn ui-btn ui-btn--outline" href="/pcm/agenda">Agenda compartilhada</a><% } %></div></header>
   <div class="pcm-shell">
-    <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+    <% if (!shared) { %><%- include('partials/internal-nav', { activePcmSection: 'programacao-semanal' }) %><% } %>
     <main class="pcm-content pcm-op-content">
-      <section class="pcm-op-actions"><div><strong>Semana de <%= formatDate(programacao.semana_inicio) %> a <%= formatDate(programacao.semana_fim) %></strong><span><%= (programacao.itens || []).length %> OS programada(s)</span></div><div class="pcm-op-actions-buttons"><a class="pcm-op-btn ui-btn ui-btn--outline" href="/pcm/programacao-semanal?semana_inicio=<%= previous.toISOString().slice(0,10) %>">Semana anterior</a><a class="pcm-op-btn ui-btn ui-btn--outline" href="/pcm/programacao-semanal">Semana atual</a><a class="pcm-op-btn ui-btn ui-btn--outline" href="/pcm/programacao-semanal?semana_inicio=<%= next.toISOString().slice(0,10) %>">Próxima semana</a></div></section>
-
-      <section class="pcm-stat-grid"><div class="pcm-stat"><span>Programadas</span><strong><%= resumo.total %></strong><small>na semana</small></div><div class="pcm-stat info"><span>Horas previstas</span><strong><%= Number(resumo.horas||0).toLocaleString('pt-BR') %></strong><small>carga programada</small></div><div class="pcm-stat warn"><span>Sem responsável</span><strong><%= resumo.sem_responsavel %></strong><small>definir executor</small></div><div class="pcm-stat danger"><span>Fila pendente</span><strong><%= resumo.pendentes %></strong><small>OS sem programação</small></div></section>
-
+      <section class="pcm-op-actions pcm-agenda-week-toolbar"><div><span class="pcm-op-section-label">Programação semanal das demandas</span><strong><%= formatDate(programacao.semana_inicio) %> a <%= formatDate(programacao.semana_fim) %></strong></div><div class="pcm-op-actions-buttons"><a class="pcm-op-btn ui-btn ui-btn--outline" href="<%= weekUrl(previous.toISOString().slice(0,10)) %>" aria-label="Semana anterior">← Anterior</a><a class="pcm-op-btn ui-btn ui-btn--outline" href="<%= basePath %>">Hoje</a><a class="pcm-op-btn ui-btn ui-btn--outline" href="<%= weekUrl(next.toISOString().slice(0,10)) %>" aria-label="Próxima semana">Próxima →</a></div></section>
+      <section class="pcm-stat-grid" aria-label="Resumo da agenda"><div class="pcm-stat"><span>Na agenda</span><strong><%= carga.length %></strong><small>serviços e instalações</small></div><div class="pcm-stat info"><span>Horas previstas</span><strong><%= carga.reduce((sum,item)=>sum+Number(item.horas_estimadas||0),0).toLocaleString('pt-BR') %></strong><small>na semana selecionada</small></div><div class="pcm-stat"><span>Etapas realizadas</span><strong><%= realizadas %></strong><small>de demandas na semana</small></div><div class="pcm-stat <%= atrasadas ? 'danger' : '' %>"><span>Prazo vencido</span><strong><%= atrasadas %></strong><small>aguardando realização</small></div></section>
+      <form class="pcm-agenda-filtros" method="GET" action="<%= basePath %>"><label>Semana<input type="date" name="semana_inicio" value="<%= programacao.semana_inicio %>"></label><label>Buscar<input type="search" name="busca" maxlength="120" value="<%= filtrosAgenda.busca || '' %>" placeholder="Demanda, equipamento ou local"></label><label>Etapa<select name="origem"><option value="">Todas as etapas</option><option value="SERVICO" <%= filtrosAgenda.origem==='SERVICO'?'selected':'' %>>Serviços de demandas</option><option value="INSTALACAO" <%= filtrosAgenda.origem==='INSTALACAO'?'selected':'' %>>Instalações</option><% if (!shared) { %><option value="OS" <%= filtrosAgenda.origem==='OS'?'selected':'' %>>Ordens de serviço</option><% } %></select></label><label>Situação<select name="status"><option value="">Todas as situações</option><% Object.entries(rotulos).forEach(([value,label])=>{ %><option value="<%= value %>" <%= filtrosAgenda.status===value?'selected':'' %>><%= label %></option><% }) %></select></label><% if (!shared) { %><label>Responsável<select name="responsavel"><option value="">Toda a equipe</option><% equipe.forEach(person=>{ %><option value="<%= person.id %>" <%= String(person.id)===filtrosAgenda.responsavel?'selected':'' %>><%= person.name %></option><% }) %></select></label><% } %><button class="pcm-op-btn ui-btn ui-btn--outline" type="submit">Aplicar</button><a href="<%= basePath %>">Limpar</a></form>
       <section class="pcm-op-panel">
-        <div class="pcm-op-panel-head"><div><span class="pcm-op-section-label">Calendário</span><h2>Agenda da equipe</h2><p>Cada cartão representa uma programação persistida no banco.</p></div></div>
-        <div class="pcm-week-grid">
-          <% (programacao.dias || []).forEach(function(day,index){ %>
-            <div class="pcm-week-day"><header><strong><%= weekdays[index] %></strong><span><%= formatDate(day) %></span></header><div class="pcm-week-items">
-              <% if (!(byDay.get(day) || []).length) { %><div class="pcm-week-empty">Sem programação</div><% } %>
-              <% (byDay.get(day) || []).forEach(function(item){ %><a class="pcm-week-item" href="/os/<%= item.os_id %>"><span><b>OS #<%= item.os_id %></b><i class="pcm-op-badge priority-<%= String(item.prioridade||'MEDIA').toLowerCase() %>"><%= item.prioridade %></i></span><strong><%= item.equipamento %></strong><small><%= item.responsavel %> · <%= Number(item.horas_estimadas||0).toLocaleString('pt-BR') %> h</small></a><% }) %>
-            </div></div>
-          <% }) %>
-        </div>
+        <div class="pcm-op-panel-head"><div><span class="pcm-op-section-label">Calendário da semana</span><h2>Agenda da equipe</h2><p>Consulte o dia, o local e a preparação de cada serviço. A conclusão registra a data em que a etapa foi realizada.</p></div></div>
+        <nav class="pcm-agenda-week-strip" aria-label="Dias da semana"><% programacao.dias.forEach((day,index)=>{ %><a href="#dia-<%= day %>" class="<%= day===hoje?'is-today':'' %>"><span><%= weekdays[index].slice(0,3) %></span><strong><%= day.slice(8) %></strong><small><%= (byDay.get(day)||[]).length %> serviço(s)</small></a><% }) %></nav>
+        <div class="pcm-agenda-days"><% programacao.dias.forEach((day,index)=>{ %><section class="pcm-agenda-day" id="dia-<%= day %>"><header><div><h3><%= weekdays[index] %></h3><span><%= formatDate(day) %><%= day===hoje?' · Hoje':'' %></span></div><span class="pcm-agenda-day-count"><%= (byDay.get(day)||[]).length %></span></header><div class="pcm-agenda-day-items">
+          <% if (!(byDay.get(day)||[]).length) { %><p class="pcm-agenda-empty">Nenhum serviço programado para este dia.</p><% } %>
+          <% (byDay.get(day)||[]).forEach(item=>{ %><% if (item.origemOS) { %><article class="pcm-agenda-evento is-os"><div class="pcm-agenda-tags"><span class="pcm-agenda-tag">OS #<%= item.os_id %></span><span class="pcm-agenda-status"><%= item.os_status || item.status %></span></div><h3><a href="/os/<%= item.os_id %>"><%= item.equipamento %></a></h3><p><%= item.responsavel || 'Responsável a definir' %> · <%= Number(item.horas_estimadas||0).toLocaleString('pt-BR') %> h</p></article><% } else { %><%- include('partials/agenda-evento', { item, equipe, semanaInicio:programacao.semana_inicio, rotulos, hoje, formatDate, podeVerDemandas, canManagePcm }) %><% } %><% }) %>
+        </div></section><% }) %></div>
       </section>
-
+      <% if (!shared && canManagePcm) { %>
+      <section class="pcm-op-panel" id="fila-demandas"><div class="pcm-op-panel-head"><div><span class="pcm-op-section-label">Próximos serviços</span><h2>Demandas aguardando programação <span class="pcm-agenda-day-count"><%= pendentes.length %></span></h2><p>Serviços em aberto entram na agenda da demanda. Fabricações concluídas e marcadas para instalação aparecem como uma nova etapa.</p></div><a class="pcm-op-btn ui-btn ui-btn--outline" href="/demandas">Abrir demandas</a></div>
+        <% if (!pendentes.length) { %><p class="pcm-agenda-empty">Nenhuma demanda aguardando programação<%= filtrosAgenda.busca ? ' para esta busca' : '' %>. Para programar uma fabricação já concluída, marque “Exige instalação posterior” na demanda.</p><% } %>
+        <div class="pcm-agenda-queue"><% pendentes.forEach(item=>{ %><details class="pcm-agenda-pendente"><summary><span class="pcm-agenda-pendente-label"><span class="pcm-agenda-tag"><%= item.etapa==='INSTALACAO'?'Instalação após fabricação':'Serviço da demanda' %> · #<%= item.id %></span><strong><%= item.titulo %></strong><span><%= item.equipamento_nome || item.setor_origem || 'Local a definir' %> · <%= item.prioridade %><%= item.prazo_previsto ? ` · Prazo ${formatDate(item.prazo_previsto)}` : '' %></span></span><span class="pcm-agenda-open-label">Programar</span></summary><div class="pcm-agenda-pendente-body"><a href="/demandas/<%= item.id %>">Consultar demanda #<%= item.id %></a><%- include('partials/agenda-form', { demandaAgenda:item, equipe, semanaInicio:programacao.semana_inicio }) %></div></details><% }) %></div>
+      </section>
+      <% } %>
+      <% if (!shared) { %>
       <section class="pcm-op-panel">
         <div class="pcm-op-panel-head"><div><span class="pcm-op-section-label">Fila sem programação</span><h2>OS que ainda precisam entrar na agenda</h2><p>Escolha data, responsável e duração. Reprogramar a mesma OS substitui a programação anterior.</p></div></div>
         <div class="pcm-op-table-wrap"><table class="pcm-op-table pcm-schedule-table"><thead><tr><th>OS / Equipamento</th><th>Prioridade</th><th>Status</th><th>Data</th><th>Responsável</th><th>Horas</th><th>Ação</th></tr></thead><tbody>
-          <% if (!atividadesSemProgramacao.length) { %><tr><td colspan="7" class="pcm-op-empty">Todo o backlog exibido já está programado nesta semana.</td></tr><% } %>
-          <% atividadesSemProgramacao.forEach(function(item){ %><tr><td><strong>OS #<%= item.id %></strong><span><%= item.equipamento %> · <%= item.tipo %></span></td><td><span class="pcm-op-badge priority-<%= String(item.prioridade||'MEDIA').toLowerCase() %>"><%= item.prioridade %></span></td><td><span class="pcm-op-badge status"><%= item.status %></span></td><td colspan="4"><% if (canManagePcm) { %><form class="pcm-schedule-form" method="POST" action="/pcm/programacao-semanal/<%= item.id %>/programar" data-pcm-loading><input type="hidden" name="semana_inicio" value="<%= programacao.semana_inicio %>"><input name="data_programada" type="date" min="<%= programacao.semana_inicio %>" max="<%= programacao.semana_fim %>" required><select name="responsavel_user_id"><option value="">Não atribuído</option><% (programacao.mecanicos || []).forEach(function(person){ %><option value="<%= person.id %>"><%= person.name %></option><% }) %></select><input name="horas_estimadas" type="number" min="0.5" max="72" step="0.5" value="2" required><button class="pcm-op-btn pcm-op-btn-small ui-btn ui-btn--outline ui-btn--compact" type="submit">Programar</button></form><% } else { %><span class="pcm-readonly">Consulta</span><% } %></td></tr><% }) %>
+          <% if (!atividadesSemProgramacao.length) { %><tr><td colspan="7" class="pcm-op-empty">Não há OS pendentes nesta fila.</td></tr><% } %>
+          <% atividadesSemProgramacao.forEach(function(item){ %><tr><td><strong>OS #<%= item.id %></strong><span><%= item.equipamento %> · <%= item.tipo %></span></td><td><span class="pcm-op-badge priority-<%= String(item.prioridade||'MEDIA').toLowerCase() %>"><%= item.prioridade %></span></td><td><span class="pcm-op-badge status"><%= item.status %></span></td><td colspan="4"><% if (canManagePcm) { %><form class="pcm-schedule-form" method="POST" action="/pcm/programacao-semanal/<%= item.id %>/programar" data-pcm-loading><input type="hidden" name="semana_inicio" value="<%= programacao.semana_inicio %>"><input aria-label="Data programada da OS" name="data_programada" type="date" min="<%= programacao.semana_inicio %>" max="<%= programacao.semana_fim %>" required><select aria-label="Responsável pela OS" name="responsavel_user_id"><option value="">Não atribuído</option><% (programacao.mecanicos || []).forEach(function(person){ %><option value="<%= person.id %>"><%= person.name %></option><% }) %></select><input aria-label="Horas previstas da OS" name="horas_estimadas" type="number" min="0.5" max="72" step="0.5" value="2" required><button class="pcm-op-btn pcm-op-btn-small ui-btn ui-btn--outline ui-btn--compact" type="submit">Programar</button></form><% } else { %><span class="pcm-readonly">Consulta</span><% } %></td></tr><% }) %>
         </tbody></table></div>
       </section>
+      <% } %>
     </main>
   </div>
 </div>
-<style>
-.pcm-week-grid{display:grid;grid-template-columns:repeat(7,minmax(165px,1fr));gap:8px;overflow:auto}.pcm-week-day{min-height:230px;border:1px solid #dfe8e3;border-radius:13px;background:#f8fbf9;overflow:hidden}.pcm-week-day>header{display:flex;justify-content:space-between;gap:8px;padding:10px;background:#eef7f1;border-bottom:1px solid #dfe8e3}.pcm-week-day>header span{color:#68778a;font-size:11px}.pcm-week-items{display:grid;gap:7px;padding:8px}.pcm-week-empty{color:#869286;font-size:11px;text-align:center;padding:34px 4px}.pcm-week-item{display:grid;gap:5px;border:1px solid #cfdfd5;border-left:3px solid #159947;border-radius:9px;background:#fff;padding:8px;text-decoration:none;color:#122033}.pcm-week-item>span{display:flex;justify-content:space-between;gap:5px}.pcm-week-item small{color:#68778a}.pcm-week-item:hover{border-color:#159947}.pcm-schedule-form{display:grid;grid-template-columns:145px minmax(150px,1fr) 78px auto;gap:7px}.pcm-schedule-form input,.pcm-schedule-form select{min-height:35px;border:1px solid #cfdbd5;border-radius:8px;background:#fff;padding:0 8px;font:inherit;font-size:12px}@media(max-width:900px){.pcm-week-grid{grid-template-columns:repeat(7,190px)}.pcm-schedule-form{grid-template-columns:1fr 1fr}.pcm-schedule-form button{width:100%}}
-</style>
 <script src="/js/pcm-operational.js" defer></script>

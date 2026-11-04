@@ -1,0 +1,16 @@
+<article class="pcm-agenda-evento <%= item.etapa === 'INSTALACAO' ? 'is-installation' : '' %> <%= item.status === 'CANCELADA' ? 'is-cancelled' : '' %>" id="agenda-<%= item.id %>">
+  <div class="pcm-agenda-evento-head"><div class="pcm-agenda-tags"><span class="pcm-agenda-tag"><%= item.etapa === 'INSTALACAO' ? 'Instalação' : 'Serviço' %> · Demanda #<%= item.demanda_id %></span><span class="pcm-agenda-status status-<%= item.status.toLowerCase() %>"><%= rotulos[item.status] || item.status %></span><% if (item.data_programada < hoje && ['PROGRAMADA','EM_ANDAMENTO'].includes(item.status)) { %><span class="pcm-agenda-status status-atrasada">Prazo vencido</span><% } %></div><strong class="pcm-agenda-time"><%= item.horario || 'Horário a combinar' %></strong></div>
+  <h3><% if (podeVerDemandas) { %><a href="/demandas/<%= item.demanda_id %>"><%= item.titulo %></a><% } else { %><%= item.titulo %><% } %></h3>
+  <dl class="pcm-agenda-meta"><div><dt>Local</dt><dd><%= item.local_servico %></dd></div><div><dt>Responsável</dt><dd><%= item.responsavel %></dd></div><div><dt>Duração prevista</dt><dd><%= Number(item.horas_estimadas).toLocaleString('pt-BR') %> h</dd></div><% if (item.equipamento) { %><div><dt>Equipamento</dt><dd><%= item.equipamento %></dd></div><% } %><% if (item.data_realizada) { %><div><dt>Realizado em</dt><dd><%= formatDate(item.data_realizada) %></dd></div><% } %></dl>
+  <% if (item.preparacao) { %><div class="pcm-agenda-preparacao"><strong>Preparação e materiais</strong><p><%= item.preparacao %></p></div><% } %>
+  <% if (canManagePcm && ['PROGRAMADA','EM_ANDAMENTO'].includes(item.status)) { %>
+    <div class="pcm-agenda-evento-actions">
+      <% if (item.status === 'PROGRAMADA') { %><details class="pcm-agenda-details"><summary>Reprogramar</summary><%- include('agenda-form', { demandaAgenda: item, equipe, semanaInicio }) %></details><% } %>
+      <details class="pcm-agenda-details"><summary>Registrar execução</summary><div class="pcm-agenda-execucao">
+        <% if (item.status === 'PROGRAMADA') { %><form method="POST" action="/pcm/programacao-semanal/demandas/<%= item.id %>/status" data-pcm-loading><input type="hidden" name="semana_inicio" value="<%= semanaInicio %>"><input type="hidden" name="status" value="EM_ANDAMENTO"><button class="pcm-op-btn ui-btn ui-btn--outline" type="submit">Iniciar etapa</button></form><% } %>
+        <form method="POST" action="/pcm/programacao-semanal/demandas/<%= item.id %>/status" class="pcm-agenda-concluir" data-pcm-loading><input type="hidden" name="semana_inicio" value="<%= semanaInicio %>"><input type="hidden" name="status" value="CONCLUIDA"><label>Realizado em<input name="data_realizada" type="date" value="<%= hoje %>" max="<%= hoje %>" required></label><button class="pcm-op-btn ui-btn ui-btn--primary" type="submit"><%= item.etapa === 'INSTALACAO' ? 'Confirmar instalação' : 'Concluir serviço e demanda' %></button></form>
+        <form method="POST" action="/pcm/programacao-semanal/demandas/<%= item.id %>/status" data-pcm-loading><input type="hidden" name="semana_inicio" value="<%= semanaInicio %>"><input type="hidden" name="status" value="CANCELADA"><button class="pcm-op-btn ui-btn ui-btn--outline" type="submit">Cancelar programação</button></form>
+      </div></details>
+    </div>
+  <% } %>
+</article>

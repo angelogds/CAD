@@ -315,6 +315,9 @@ app.use((req, res, next) => {
   res.locals.activeMenu = res.locals.activeMenu || "";
   res.locals.activePcmSection = res.locals.activePcmSection || "";
 
+  res.locals.agendaNotificacoes = { total: 0, items: [] };
+  try { res.locals.agendaNotificacoes = require('./modules/pcm/pcm.agenda.service').notificacoes(req.session?.user); } catch (_) {}
+
   // contadores operacionais globais (menu/alertas inteligentes)
   try {
     const osAbertas = db.prepare(`

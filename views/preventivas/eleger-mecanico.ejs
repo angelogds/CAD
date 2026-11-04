@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/preventivas-form.css?v=20260919-p3">
 
+<%- include('../pcm/partials/internal-styles') %>
 <main class="preventive-secondary-page">
   <header class="preventive-secondary-hero">
     <div>
@@ -12,6 +13,7 @@
       <a class="ui-btn ui-btn--secondary" href="<%= typeof backUrl !== 'undefined' ? backUrl : '/preventivas' %>">Voltar ao painel</a>
     </div>
   </header>
+  <div class="pcm-shell"><%- include('../pcm/partials/internal-nav', { activePcmSection: 'preventivas' }) %></div>
 
   <section class="preventive-secondary-kpis" aria-label="Disponibilidade da equipe">
     <article class="preventive-secondary-kpi">

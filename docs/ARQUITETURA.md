@@ -13,6 +13,8 @@ Documento curto da fase de estabilização técnica para reduzir ambiguidade de 
 - Almoxarifado: `/almoxarifado`
 - Estoque: `/estoque`
 - PCM: `/pcm`
+- Agenda de demandas, serviços e instalações do PCM: `/pcm/programacao-semanal` (mantém a programação das OS).
+- Consulta compartilhada da agenda: `/pcm/agenda` (permissão própria; exclui frigorífico e logística).
 - Roteiro de inspeção do mecânico: `/inspecao/roteiros` (antes das rotas de relatório `/:ano/:mes`).
 - Gestão e programação dos roteiros no PCM: `/pcm/preventivas/roteiros`.
 

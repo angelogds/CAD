@@ -21,6 +21,7 @@
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'meu-portal') { %><link rel="stylesheet" href="/css/meu-portal-modernizacao.css?v=20260910-p5" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'escala') { %><link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20261014-v6" /><% } %>
+  <link rel="stylesheet" href="/css/agenda-notificacoes.css?v=20261104-1" />
   <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
 </head>
 <body>
@@ -78,6 +79,18 @@
                   <% }) %>
                 </div>
               </details>
+              <% if (typeof canAccessModule === 'function' && canAccessModule(user.role, 'agenda_servicos_view')) { %>
+              <% const agendaNotifs = typeof agendaNotificacoes !== 'undefined' ? agendaNotificacoes : {total:0,items:[]}; %>
+              <details class="topbar-notification-wrap agenda-bell">
+                <summary class="btn btn-ghost topbar-notification" aria-label="Avisos da agenda de serviços"><span class="agenda-bell-label">Agenda</span><strong class="topbar-counter"><%= agendaNotifs.total %></strong></summary>
+                <div class="topbar-popover topbar-notification-dropdown agenda-notification-dropdown">
+                  <div class="agenda-notification-head"><strong>Avisos da agenda</strong><a href="/pcm/agenda">Ver agenda</a></div>
+                  <% if (!agendaNotifs.items.length) { %><div class="muted topbar-empty-state">Nenhum novo aviso de serviços ou instalações.</div><% } %>
+                  <% agendaNotifs.items.forEach(n => { %><a class="topbar-notification-item" href="/pcm/agenda?semana_inicio=<%= n.data_programada %>#agenda-<%= n.origem_id %>"><strong><%= n.titulo %></strong><span class="agenda-notification-message"><%= n.mensagem %></span></a><% }) %>
+                  <% if (agendaNotifs.total) { %><form method="POST" action="/pcm/agenda/notificacoes/lidas"><button class="btn btn-ghost" type="submit">Marcar avisos como lidos</button></form><% } %>
+                </div>
+              </details>
+              <% } %>
               <details class="user-menu">
                 <summary class="pill user-menu-summary" aria-label="Abrir menu do usuário">
                   <% if (user.photo_path) { %>

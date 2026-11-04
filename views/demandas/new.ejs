@@ -76,6 +76,11 @@
           <small>Evite burocracia: informe apenas o suficiente para a equipe entender a necessidade.</small>
         </label>
 
+        <label class="form-wide demand-installation-check">
+          <input type="checkbox" name="requer_instalacao" value="1" <%= Number(currentDemand.requer_instalacao) === 1 ? 'checked' : '' %>>
+          <span><strong>Exige instalação posterior</strong><small>Para fabricação de equipamento: após concluir a demanda, o PCM agenda a instalação no local.</small></span>
+        </label>
+
         <details class="form-wide demand-advanced-fields" <%= isEdit ? 'open' : '' %>>
           <summary>+ Adicionar informações de planejamento</summary>
           <div class="demand-advanced-grid">

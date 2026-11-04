@@ -108,6 +108,16 @@ const MODULES = [
     ],
   },
   {
+    key: 'agenda-servicos',
+    title: 'Agenda de serviços',
+    icon: '▦',
+    category: 'Planejamento',
+    permission: 'agenda_servicos_view',
+    href: '/pcm/agenda',
+    summary: 'Programação das demandas e instalações da reciclagem: datas, responsáveis e preparação de materiais.',
+    actions: [['agenda_servicos_view', 'Consultar serviços e avisos da agenda'], ['pcm_manage', 'Programar e registrar a realização no PCM']],
+  },
+  {
     key: 'demandas',
     title: 'Demandas',
     icon: '☷',

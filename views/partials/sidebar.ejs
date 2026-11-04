@@ -73,6 +73,7 @@
     <% if (canLubrificacaoExecucao) { %><%- navItem('/lubrificacao', 'Roteiro de Lubrificação', activeMenu === 'lubrificacao') %><% } %>
     <% if (role === 'MECANICO') { %><%- navItem('/inspecao/roteiros', 'Roteiro de inspeção', activeMenu === 'roteiro-inspecao') %><% } %>
     <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
+    <% if (can('agenda_servicos_view')) { %><%- navItem('/pcm/agenda', 'Agenda de serviços', activeMenu === 'agenda-servicos') %><% } %>
     <% if (canSolicitacoes && !isCompras) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
     <% if (canAcompanhamentoOnly) { %><%- navItem('/acompanhamento-compras', 'Acompanhamento de Compras', activeMenu === 'solicitacoes') %><% } %>
     <% if (canPreSolicitacoes) { %><%- navItem('/pre-solicitacoes', 'Pré-Solicitações', activeMenu === 'pre-solicitacoes') %><% } %>
@@ -102,7 +103,7 @@
         <div class="nav-submenu">
           <a class="nav-item nav-subitem <%= currentPcmSection === 'visao-geral' ? 'active' : '' %>" href="/pcm"><span class="nav-label">Visão Geral</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'planejamento' ? 'active' : '' %>" href="/pcm/planejamento"><span class="nav-label">Plano Mestre</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'programacao-semanal' ? 'active' : '' %>" href="/pcm/programacao-semanal"><span class="nav-label">Programação Semanal</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'programacao-semanal' ? 'active' : '' %>" href="/pcm/programacao-semanal"><span class="nav-label">Agenda de serviços</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'lubrificacao' ? 'active' : '' %>" href="/pcm/lubrificacao"><span class="nav-label">Plano de Lubrificação</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'engenharia' ? 'active' : '' %>" href="/pcm/engenharia"><span class="nav-label">Engenharia e Criticidade</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'falhas' ? 'active' : '' %>" href="/pcm/falhas"><span class="nav-label">Falhas e Confiabilidade</span></a>

@@ -54,6 +54,8 @@ const ACCESS = {
   // lubrificação e demais telas técnicas. Seus indicadores ficam em /diretoria.
   pcm: [ROLE.ADMIN, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR],
   pcm_manage: [ROLE.ADMIN, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR],
+  // Consulta da agenda da reciclagem, sem conceder gestão do PCM.
+  agenda_servicos_view: Object.values(ROLE).filter(role => ![ROLE.ENCARREGADO_FRIGORIFICO, ROLE.ENCARREGADO_LOGISTICA].includes(role)),
   ferramental_view: [ROLE.ADMIN, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.MECANICO],
   equipamentos: [ROLE.INSPECAO_QUALIDADE, ROLE.ADMIN, ROLE.DIRETORIA, ROLE.MECANICO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.COORDENADOR_RECICLAGEM],
   equipamentos_manage: [ROLE.ADMIN, ROLE.MECANICO, ROLE.MANUTENCAO_SUPERVISOR],
