@@ -5,7 +5,7 @@ import { SelectionManager } from './interaction/selection.manager.js';
 import { PromptManager } from './interaction/prompt.manager.js';
 import { ViewportController } from './viewport/viewport.controller.js';
 import { InteractionController } from './interaction/interaction.controller.js';
-import { DesenhoTecnicoRenderer } from './desenho-tecnico.renderer.js?v=20261028-706-step-v1';
+import { DesenhoTecnicoRenderer } from './desenho-tecnico.renderer.js?v=20261127-chaveta';
 import { SelectTool } from './tools/select.tool.js';
 import { PanTool } from './tools/pan.tool.js';
 import { LineTool } from './tools/line.tool.js';
@@ -17,7 +17,7 @@ import { ZoomWindowTool } from './tools/zoom-window.tool.js';
 import { PolylineTool } from './tools/polyline.tool.js';
 import { TextTool } from './tools/text.tool.js';
 import { CenterlineTool } from './tools/centerline.tool.js';
-import { ShaftTool } from './tools/shaft.tool.js?v=20261028-706-step-v1';
+import { ShaftTool } from './tools/shaft.tool.js?v=20261127-chaveta';
 import { ArcTool } from './tools/arc.tool.js';
 import { TrimTool } from './tools/trim.tool.js?v=20261028-706-step-v1';
 import { ExtendTool } from './tools/extend.tool.js';
@@ -35,6 +35,7 @@ import { TextEntity } from './entities/text.entity.js';
 import { DimensionEntity } from './entities/dimension.entity.js';
 import { ArcEntity } from './entities/arc.entity.js';
 import { ShaftEntity } from './entities/shaft.entity.js';
+import { keywayLabel } from './core/shaft-keyway.mjs';
 import {
   angle2D,
   circleCircleIntersections,
@@ -702,6 +703,8 @@ export class DesenhoTecnicoController {
       details += readOnly('Trechos', (geo.segments || []).length);
       details += readOnly('Comp. total', total.toFixed(2));
       details += input('origin.x', 'Origem X', geo.origin?.x || 0, 'number') + input('origin.y', 'Origem Y', geo.origin?.y || 0, 'number');
+      if (geo.keyway) details += `<p class="cad-muted">${keywayLabel(geo.keyway)}</p>`;
+      if (this.isEntityEditable(entity)) details += '<button class="cad-btn cad-btn-secondary" data-edit-shaft-keyway type="button">Editar chaveta</button>';
     } else if (entity.type === 'dimension') {
       if (geo.dimensionLinePoint) {
         details += input('dimensionLinePoint.x', 'Linha da cota X', geo.dimensionLinePoint.x, 'number') + input('dimensionLinePoint.y', 'Linha da cota Y', geo.dimensionLinePoint.y, 'number');
@@ -718,6 +721,11 @@ export class DesenhoTecnicoController {
       details += `<div class='cad-prop-section-title'>Volume 3D</div><label class='cad-field'><span>Espessura ${flange ? 'do flange' : 'do perfil'} (mm)</span><input class='cad-input' data-extrusion-depth type='number' min='0.001' max='1000000' step='0.001' placeholder='Sem volume 3D' value='${Number.isFinite(Number(depth)) && Number(depth) > 0 ? Number(depth) : ''}'></label><p class='cad-muted'>Informe a espessura real para visualizar o volume. Vazio mantém o desenho apenas em 2D.</p>`;
     }
     props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${escapeValue(entity.id)}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${escapeValue(l)}'>${escapeValue(l)}</option>`).join('')}</select></div>${details}${styleDetails}`;
+    props.querySelector('[data-edit-shaft-keyway]')?.addEventListener('click', () => {
+      this.toolManager.set('shaft');
+      this.toolManager.active.editKeyway(entity);
+      this.render();
+    });
     props.querySelector('[data-extrusion-depth]')?.addEventListener('change', (event) => {
       const raw = event.target.value.trim();
       const depth = raw ? Number(raw) : null;
@@ -978,7 +986,7 @@ export class DesenhoTecnicoController {
         window.location.assign(pdfUrl);
       },
       'view-3d-shaft': async () => {
-        const { openShaft3D } = await import('/js/cad-shaft-3d.mjs?v=20261028-drafting-3d-v1');
+        const { openShaft3D } = await import('/js/cad-shaft-3d.mjs?v=20261127-chaveta');
         await openShaft3D({
           cadData: this.serialize(),
           drawingId: window.CAD_INITIAL?.desenhoId,

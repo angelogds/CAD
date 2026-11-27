@@ -56,6 +56,10 @@ textarea.cad-input{resize:vertical;min-height:70px}
 .cad-shaft-segments td{padding:5px 6px;background:var(--cad-surface-raised)}
 .cad-segment-index{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--cad-accent-soft);color:var(--cad-accent);font-weight:650}
 .cad-shaft-add{width:100%;min-height:34px;border:1px dashed var(--cad-accent);border-radius:5px;background:var(--cad-accent-soft);color:var(--cad-text);font:inherit;cursor:pointer}
+.cad-shaft-keyway-toggle{display:flex;align-items:center;gap:8px;margin-top:15px;cursor:pointer}
+.cad-shaft-keyway-fields{margin:10px 0 0;padding:10px 12px;border:1px solid var(--cad-border);border-radius:6px;min-width:0}
+.cad-shaft-keyway-fields legend{color:var(--cad-muted);font-size:12px;padding:0 4px}
+.cad-shaft-keyway-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr));gap:10px}
 .cad-fullscreen :is(button,a,input,select,textarea):focus-visible{outline:2px solid var(--cad-accent);outline-offset:2px}
 @media(max-width:640px){.cad-form-grid{grid-template-columns:1fr}.cad-modal-body{padding:13px}.cad-modal-intro{padding:9px}.cad-modal-intro p{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.cad-fullscreen *,.cad-fullscreen *::before,.cad-fullscreen *::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}

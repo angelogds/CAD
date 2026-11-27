@@ -64,6 +64,36 @@ test('malha do eixo conserva dimensões e não inventa chanfros nas extremidades
   } finally { geometry.dispose(); }
 });
 
+test('chaveta remove volume da ponta até o comprimento, a largura e a profundidade cadastrados', async () => {
+  const [{ createModelGeometry }, THREE] = await modules;
+  const { buildModel3D } = await import('../public/js/cad-model-3d.logic.mjs');
+  const keyway = { length: 150, width: 40, depth: 10 };
+  const segments = [{ length: 275, diameter: 130 }, { length: 130, diameter: 150 }, { length: 500, diameter: 177.8 }];
+  const { items: [item] } = buildModel3D({ objects: [{ type: 'shaft', geometry: {
+    origin: { x: 0, y: 0 }, segments, keyway,
+  } }] });
+  assert.deepEqual(item.keyway, keyway);
+  const geometry = createModelGeometry(item);
+  const material = new THREE.MeshBasicMaterial();
+  try {
+    const mesh = new THREE.Mesh(geometry, material);
+    const hit = (x, y, z, direction) => new THREE.Raycaster(
+      new THREE.Vector3(x, y, z), new THREE.Vector3(...direction),
+    ).intersectObject(mesh)[0]?.point;
+    approx(hit(0, 50, 80, [0, 0, -1]).z, 55, 1e-6);
+    approx(hit(0, 160, 80, [0, 0, -1]).z, 65, 1e-6);
+    approx(hit(0, 50, 60, [1, 0, 0]).x, 20, 1e-6);
+    approx(hit(0, -1, 60, [0, 1, 0]).y, 150, 1e-6);
+    approx(hit(0, -1, 52, [0, 1, 0]).y, 0, 1e-6);
+    const shaftVolume = Math.PI * segments.reduce((sum, s) => sum + (s.diameter / 2) ** 2 * s.length, 0);
+    const removedArea = 20 * Math.sqrt(65 ** 2 - 20 ** 2) + 65 ** 2 * Math.asin(20 / 65) - 40 * 55;
+    approx(signedVolume(geometry), shaftVolume - removedArea * 150, .001);
+  } finally {
+    geometry.dispose();
+    material.dispose();
+  }
+});
+
 test('alojamento cego conserva fundo na profundidade real; alojamento passante permanece aberto', async () => {
   const [{ createModelGeometry }, THREE] = await modules;
   const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });

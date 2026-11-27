@@ -1,3 +1,5 @@
+const { keywayPlan } = require('./desenho-tecnico.shaft-keyway');
+
 function generateDrawingFrame(w = 900, h = 560) {
   return `<rect x="20" y="20" width="${w - 40}" height="${h - 40}" fill="#fff" stroke="#1f2937" stroke-width="2" />`;
 }
@@ -163,7 +165,7 @@ function renderCadDrawing(cad = {}) {
     const vertical = geometry.orientation === 'vertical';
     let x = origin.x;
     let y = origin.y;
-    return (geometry.segments || []).map((segment) => {
+    const outline = (geometry.segments || []).map((segment) => {
       const radius = segment.diameter / 2;
       const rect = vertical
         ? `<rect x="${x - radius}" y="${y}" width="${segment.diameter}" height="${segment.length}" />`
@@ -171,6 +173,10 @@ function renderCadDrawing(cad = {}) {
       if (vertical) y += segment.length; else x += segment.length;
       return rect;
     }).join('');
+    const slot = keywayPlan(geometry);
+    return outline + (slot.length
+      ? `<polyline points="${slot.map(p => `${p.x},${p.y}`).join(' ')}" stroke-width="1.5" />`
+      : '');
   };
   const byLayer = {};
   for (const obj of objects) {

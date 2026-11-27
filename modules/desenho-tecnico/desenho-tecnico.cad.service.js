@@ -1,4 +1,5 @@
 const { sanitizeManufacturing } = require('./desenho-tecnico.layout');
+const { normalizeKeyway } = require('./desenho-tecnico.shaft-keyway');
 
 const TECH_LAYERS = ['geometria_principal', 'contorno', 'centro', 'linhas_de_centro', 'cotas', 'eixos', 'furacao', 'furos', 'construcao', 'observacoes', 'textos'];
 const TECH_LAYER_COLORS = {
@@ -150,20 +151,23 @@ function normalizeObject(obj = {}) {
 
   if (base.type === 'shaft') {
     const geometry = plainObject(obj.geometry);
+    const segments = Array.isArray(geometry.segments)
+      ? geometry.segments.map((segment) => ({
+        length: Math.abs(toFinite(segment.length)),
+        diameter: Math.abs(toFinite(segment.diameter)),
+      })).filter((segment) => segment.length > 0 && segment.diameter > 0)
+      : [];
+    const bore = geometry.bore && typeof geometry.bore === 'object'
+      ? { diameter: toFinite(geometry.bore.diameter), depth: toFinite(geometry.bore.depth), from: 'start' }
+      : null;
+    const keyway = normalizeKeyway(geometry.keyway, segments[0], bore);
     return {
       ...base,
       geometry: {
         origin: normalizePoint(geometry.origin),
         orientation: geometry.orientation === 'vertical' ? 'vertical' : 'horizontal',
-        segments: Array.isArray(geometry.segments)
-          ? geometry.segments.map((segment) => ({
-            length: Math.abs(toFinite(segment.length)),
-            diameter: Math.abs(toFinite(segment.diameter)),
-          })).filter((segment) => segment.length > 0 && segment.diameter > 0)
-          : [],
-        bore: geometry.bore && typeof geometry.bore === 'object'
-          ? { diameter: toFinite(geometry.bore.diameter), depth: toFinite(geometry.bore.depth), from: 'start' }
-          : null,
+        segments, bore,
+        ...(keyway ? { keyway } : {}),
         crossHoles: Array.isArray(geometry.crossHoles)
           ? geometry.crossHoles.map(hole => ({ distance: toFinite(hole.distance), diameter: toFinite(hole.diameter) }))
           : [],
@@ -183,12 +187,14 @@ function sanitizeShaftSheet(input) {
   const bore = input.bore && typeof input.bore === 'object'
     ? { diameter: toFinite(input.bore.diameter), depth: toFinite(input.bore.depth), from: 'start' }
     : null;
+  const keyway = normalizeKeyway(input.keyway, segments[0], bore);
   const crossHoles = Array.isArray(input.crossHoles)
     ? input.crossHoles.slice(0, 36).map(h => ({ distance: toFinite(h.distance), diameter: toFinite(h.diameter) }))
     : [];
   return {
     origin: normalizePoint(input.origin),
     orientation: 'horizontal', segments, bore, crossHoles,
+    ...(keyway ? { keyway } : {}),
   };
 }
 

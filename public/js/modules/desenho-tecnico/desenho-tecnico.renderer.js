@@ -1,4 +1,5 @@
 import { Bounds2D } from './core/geometry.js';
+import { keywayLabel, keywayPlan } from './core/shaft-keyway.mjs';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -186,6 +187,12 @@ export class DesenhoTecnicoRenderer {
         g.insertAdjacentHTML('beforeend', `<line x1='${step.x}' y1='${step.y - 8}' x2='${step.x}' y2='${step.y + 8}' stroke='${stroke}' stroke-width='1'/>`);
       }
     });
+    const slot = keywayPlan(e.geometry).map(point => this.viewport.worldToScreen(point.x, point.y));
+    if (slot.length) {
+      g.insertAdjacentHTML('beforeend', `<polyline points='${slot.map(p => `${p.x},${p.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+      const end = slot[1];
+      drawMeasureLabel(g, Math.min(end.x, slot[2].x) + 5, Math.min(end.y, slot[2].y) - 8, keywayLabel(e.geometry.keyway));
+    }
   }
 
   renderLinearDimension(g, geometry, stroke, width = 1.5, dashAttr = '') {

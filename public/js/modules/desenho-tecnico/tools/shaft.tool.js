@@ -1,5 +1,6 @@
 import { BaseTool } from './base.tool.js';
 import { ShaftEntity } from '../entities/shaft.entity.js';
+import { readKeyway } from '../core/shaft-keyway.mjs';
 
 const DEFAULT_SEGMENTS = [
   { length: 40, diameter: 25 },
@@ -14,8 +15,8 @@ export class ShaftTool extends BaseTool {
     this.origin = null;
     this.orientation = 'horizontal';
     this.segments = [];
-    this.bore = null;
-    this.crossHoles = [];
+    this.keyway = null;
+    this.editing = null;
     this.modal = null;
     this.form = null;
     this.isBound = false;
@@ -24,14 +25,14 @@ export class ShaftTool extends BaseTool {
   activate() {
     this.origin = null;
     this.segments = [];
-    this.bore = null;
-    this.crossHoles = [];
+    this.keyway = null;
     this.clearPreview();
     this.openModal();
   }
 
   deactivate() {
     this.hideModal();
+    this.editing = null;
     this.clearPreview();
   }
 
@@ -44,32 +45,48 @@ export class ShaftTool extends BaseTool {
     }
     this.bindModal();
     if (!this.form.querySelector('[data-shaft-segment-row]')) this.renderRows(DEFAULT_SEGMENTS);
+    this.setKeyway(null);
     const error = this.modal.querySelector('[data-shaft-error]');
     if (error) error.textContent = '';
     this.modal.hidden = false;
+    this.form.querySelector('[name="segmentLength"]')?.focus();
     this.ctx.prompt.set({ message: 'Configure os trechos, comprimentos e diâmetros do eixo.' });
   }
 
   bindModal() {
     if (this.isBound) return;
     this.isBound = true;
+    const errorMessage = this.modal.querySelector('[data-shaft-error]');
+    this.form.addEventListener('input', () => { errorMessage.textContent = ''; });
+    this.form.elements.hasKeyway.addEventListener('change', () => this.toggleKeywayFields(true));
     this.form.addEventListener('submit', (event) => {
       event.preventDefault();
       try {
         this.orientation = this.form.elements.orientation.value === 'vertical' ? 'vertical' : 'horizontal';
-        this.segments = this.readRows();
-        if (!this.segments.length) throw new Error('Adicione pelo menos um trecho.');
-        // Etapa simples: somente comprimento e diametro. Furação é detalhamento posterior.
-        this.bore = null;
-        this.crossHoles = [];
+        const segments = this.readRows();
+        if (!segments.length) throw new Error('Adicione pelo menos um trecho.');
+        const fields = this.form.elements;
+        this.keyway = readKeyway(fields.hasKeyway.checked ? {
+          length: fields.keywayLength.value, width: fields.keywayWidth.value, depth: fields.keywayDepth.value,
+        } : null, segments[0], this.editing?.geometry.bore);
+        if (this.editing) {
+          if (!this.ctx.isEntityEditable(this.editing)) throw new Error('Desbloqueie a camada para editar a chaveta.');
+          if (this.keyway) this.editing.geometry.keyway = this.keyway;
+          else delete this.editing.geometry.keyway;
+          this.ctx.pushHistory();
+          this.ctx.markDirty(this.keyway ? 'Chaveta atualizada' : 'Chaveta removida');
+          this.ctx.toolManager.set('select');
+          this.ctx.render();
+          return;
+        }
+        this.segments = segments;
         this.hideModal();
         const total = this.segments.reduce((sum, item) => sum + item.length, 0);
         this.ctx.prompt.set({ message: 'Eixo configurado: clique no ponto inicial para posicionar.' });
         this.ctx.statusMessage = `Eixo com ${this.segments.length} trechos • comprimento ${total.toFixed(2)} mm`;
         this.ctx.render();
       } catch (error) {
-        const message = this.modal.querySelector('[data-shaft-error]');
-        if (message) message.textContent = error.message;
+        errorMessage.textContent = error.message;
       }
     });
     this.modal.querySelector('[data-shaft-add]')?.addEventListener('click', () => {
@@ -89,6 +106,37 @@ export class ShaftTool extends BaseTool {
       this.ctx.toolManager.set('select');
       this.ctx.render();
     }));
+  }
+
+  toggleKeywayFields(focus = false) {
+    const enabled = this.form.elements.hasKeyway.checked;
+    const fields = this.form.querySelector('#cadShaftKeywayFields');
+    fields.hidden = !enabled;
+    fields.disabled = !enabled;
+    if (enabled && focus) this.form.elements.keywayLength.focus();
+  }
+
+  setKeyway(keyway) {
+    const fields = this.form.elements;
+    fields.hasKeyway.checked = Boolean(keyway);
+    fields.keywayLength.value = keyway?.length ?? '';
+    fields.keywayWidth.value = keyway?.width ?? '';
+    fields.keywayDepth.value = keyway?.depth ?? '';
+    this.toggleKeywayFields();
+  }
+
+  editKeyway(entity) {
+    this.editing = entity;
+    const { segments, keyway, orientation } = entity.geometry;
+    this.renderRows(segments);
+    this.form.elements.orientation.value = orientation;
+    this.form.elements.orientation.disabled = true;
+    this.form.querySelector('[data-shaft-add]').hidden = true;
+    this.form.querySelectorAll('[data-shaft-segment-row] input, [data-shaft-remove]')
+      .forEach(element => { element.disabled = true; });
+    this.form.querySelector('[data-shaft-submit]').textContent = 'Salvar chaveta';
+    this.setKeyway(keyway);
+    this.form.elements.hasKeyway.focus();
   }
 
   safeReadRows() {
@@ -122,13 +170,19 @@ export class ShaftTool extends BaseTool {
   }
 
   hideModal() {
-    if (this.modal) this.modal.hidden = true;
+    if (!this.modal) return;
+    this.modal.hidden = true;
+    if (!this.editing) return;
+    this.form.elements.orientation.disabled = false;
+    this.form.querySelector('[data-shaft-add]').hidden = false;
+    this.form.querySelector('[data-shaft-submit]').textContent = 'Continuar e posicionar';
+    this.renderRows(DEFAULT_SEGMENTS);
   }
 
   onMouseMove(evt) {
     if (!this.segments.length) return;
     const origin = this.ctx.getPoint(evt.world);
-    this.setPreview([{ type: 'shaft', geometry: { origin, orientation: this.orientation, segments: this.segments, bore: this.bore, crossHoles: this.crossHoles } }]);
+    this.setPreview([{ type: 'shaft', geometry: { origin, orientation: this.orientation, segments: this.segments, keyway: this.keyway } }]);
   }
 
   onMouseDown(evt) {
@@ -139,8 +193,9 @@ export class ShaftTool extends BaseTool {
         origin: { ...this.origin },
         orientation: this.orientation,
         segments: this.segments.map((segment) => ({ ...segment })),
-        bore: this.bore,
-        crossHoles: this.crossHoles.map(hole => ({ ...hole })),
+        bore: null,
+        crossHoles: [],
+        ...(this.keyway ? { keyway: this.keyway } : {}),
       },
       metadata: { layer: 'eixos', componentType: 'shaft', groupId: crypto.randomUUID() },
     }));

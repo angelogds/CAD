@@ -246,6 +246,17 @@ def export_dxf(cad: dict[str, Any]) -> tuple[str, list[str]]:
                 origin = g.get("origin") or {}
                 x, y = _num(origin.get("x")), _num(origin.get("y"))
                 orientation = str(g.get("orientation") or "horizontal")
+                keyway = g.get("keyway")
+                if keyway:
+                    length = _num(keyway.get("length"))
+                    half = _num(keyway.get("width")) / 2
+                    if orientation == "vertical":
+                        pts = [(x - half, y), (x - half, y + length),
+                               (x + half, y + length), (x + half, y)]
+                    else:
+                        pts = [(x, y - half), (x + length, y - half),
+                               (x + length, y + half), (x, y + half)]
+                    msp.add_lwpolyline(pts, dxfattribs=attrs)
                 for seg in g.get("segments") or []:
                     length, diameter = _num(seg.get("length")), _num(seg.get("diameter"))
                     r = diameter / 2

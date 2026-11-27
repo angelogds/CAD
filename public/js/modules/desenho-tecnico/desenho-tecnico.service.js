@@ -1,4 +1,4 @@
-import { DesenhoTecnicoController } from './desenho-tecnico.controller.js?v=20261029-workspace-v1';
+import { DesenhoTecnicoController } from './desenho-tecnico.controller.js?v=20261127-chaveta';
 import { installCadFinal2D } from '../../cad-final-2d.js';
 import { installCadProfessionalWorkspace } from './cad-professional-workspace.js';
 

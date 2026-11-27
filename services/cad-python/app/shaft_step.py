@@ -37,6 +37,20 @@ def validate_shaft(spec):
         if d >= sections[0]["diameter"] or h > sections[0]["length"]:
             raise ValueError("Alojamento precisa caber no primeiro trecho")
         bore = {"diameter": d, "depth": h}
+    keyway = None
+    if spec.get("keyway") is not None:
+        obj = spec["keyway"]
+        if not isinstance(obj, Mapping): raise ValueError("Chaveta inválida")
+        length = positive(obj.get("length"), "Comprimento da chaveta", sections[0]["length"])
+        width = positive(obj.get("width"), "Largura da chaveta", sections[0]["diameter"])
+        radius = sections[0]["diameter"] / 2
+        depth = positive(obj.get("depth"), "Profundidade da chaveta", radius)
+        floor = radius - depth
+        if floor <= 0 or math.hypot(width / 2, floor) >= radius:
+            raise ValueError("Chaveta precisa caber no diâmetro do primeiro trecho")
+        if bore and floor <= bore["diameter"] / 2:
+            raise ValueError("Chaveta alcança o alojamento axial")
+        keyway = {"length": length, "width": width, "depth": depth}
     raw_holes = spec.get("crossHoles") or []
     if not isinstance(raw_holes, list) or len(raw_holes) > 36:
         raise ValueError("Máximo de 36 furos transversais")
@@ -53,7 +67,7 @@ def validate_shaft(spec):
     for a, b in zip(holes, holes[1:]):
         if b["distance"] - a["distance"] <= (a["diameter"]+b["diameter"])/2:
             raise ValueError("Furos transversais sobrepostos")
-    return {"segments": sections, "bore": bore, "crossHoles": holes,
+    return {"segments": sections, "bore": bore, "keyway": keyway, "crossHoles": holes,
             "total": total, "maxDiameter": max(s["diameter"] for s in sections)}
 
 def make_step(spec):
@@ -61,7 +75,7 @@ def make_step(spec):
     model = validate_shaft(spec)
     try:
         from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
-        from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+        from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
         from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut
         from OCP.BRepCheck import BRepCheck_Analyzer
         from OCP.TopExp import TopExp_Explorer
@@ -96,6 +110,14 @@ def make_step(spec):
         drill = cylinder((hole["distance"],0,-model["maxDiameter"]),
             (0,0,1),radius,2*model["maxDiameter"])
         solid = boolean(BRepAlgoAPI_Cut(solid,drill),"furo transversal")
+    if model["keyway"]:
+        keyway = model["keyway"]
+        floor = model["segments"][0]["diameter"] / 2 - keyway["depth"]
+        cutter = BRepPrimAPI_MakeBox(
+            gp_Pnt(-1, -keyway["width"] / 2, floor),
+            keyway["length"] + 1, keyway["width"], keyway["depth"] + 1,
+        ).Shape()
+        solid = boolean(BRepAlgoAPI_Cut(solid, cutter), "rasgo de chaveta")
     if solid.IsNull() or not BRepCheck_Analyzer(solid).IsValid():
         raise ValueError("Geometria STEP inválida")
     explorer = TopExp_Explorer(solid,TopAbs_SOLID)
@@ -121,10 +143,13 @@ def make_step(spec):
         with open(tmp_path,"rb") as f: raw = f.read(LIMIT+1)
         if len(raw) > LIMIT: raise ValueError("Arquivo STEP acima de 8 MB")
         if not raw.startswith(b"ISO-10303-21;"): raise ValueError("STEP sem cabeçalho válido")
-        return {"content_base64":base64.b64encode(raw).decode("ascii"),
+        result = {"content_base64":base64.b64encode(raw).decode("ascii"),
                 "bytes":len(raw),"volume_mm3":round(volume,2),
                 "length_mm":model["total"],"max_diameter_mm":model["maxDiameter"],
                 "holes":len(model["crossHoles"]),"units":"MM",
                 "chamfers":"not_specified"}
+        if model["keyway"]:
+            result["keyway"] = model["keyway"]
+        return result
     finally:
         if tmp_path and os.path.exists(tmp_path): os.unlink(tmp_path)
