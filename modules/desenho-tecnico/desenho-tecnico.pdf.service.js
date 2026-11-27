@@ -7,6 +7,7 @@ const dimensionPdf = require('./desenho-tecnico.dimension-pdf');
 const layoutUtils = require('./desenho-tecnico.layout');
 const shaftSheet = require('./desenho-tecnico.shaft-sheet');
 const { keywayPlan } = require('./desenho-tecnico.shaft-keyway');
+const { drawBrandLogo } = require('./desenho-tecnico.pdf-brand');
 
 const PDF_DIR = path.join(storagePaths.PDF_DIR, 'desenho-tecnico');
 if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
@@ -598,6 +599,7 @@ function drawLegend(doc, desenho, pageWidth, pageHeight, margin, options) {
     .text('Manutenção Industrial', col1, legendY + 25);
   doc.text('Sistema CAD 2D', col1, legendY + 35);
   doc.text('Desenho Técnico', col1, legendY + 45);
+  drawBrandLogo(doc, col1 + 108, legendY + 7, 66, 66);
 
   // Coluna 2: Informações do desenho
   doc.fontSize(7)
