@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const PDFDocument = require('pdfkit');
 const { normalizeKeyway } = require('./desenho-tecnico.shaft-keyway');
+const { drawBrandLogo } = require('./desenho-tecnico.pdf-brand');
 
 const FONT = 'Helvetica';
 const BOLD = 'Helvetica-Bold';
@@ -622,7 +623,6 @@ async function prepareSheetModel(shaft) {
 
 function frame(doc, desenho, model, cadData) {
   const W = doc.page.width, H = doc.page.height;
-  const logo = path.join(__dirname, '..', '..', 'public', 'IMG', 'logopdf_campo_do_gado.png.png');
   const ink='#1b2937';
   doc.save().strokeColor(ink).lineWidth(1.15).rect(18,18,W-36,H-36).stroke().restore();
   doc.save().strokeColor('#7f8b99').lineWidth(.65).rect(23,23,W-46,H-46).stroke().restore();
@@ -663,10 +663,9 @@ function frame(doc, desenho, model, cadData) {
   text(doc,model.keyway ? 'ARESTAS/CHANFROS ILUSTRATIVOS NA REPRESENTAÇÃO 2D.'
     : 'ARESTAS/CHANFROS ILUSTRATIVOS: CONFIRMAR MEDIDA PARA USINAGEM.',
     36,model.keyway ? 806 : 800,7,{width:548});
-  try {
-    if(fs.existsSync(logo))doc.image(logo,625,705,{fit:[166,105],align:'center',valign:'center'});
-    else text(doc,'CAMPO DO GADO',631,741,15,{bold:true});
-  }catch(_e){text(doc,'CAMPO DO GADO',631,741,15,{bold:true});}
+  if (!drawBrandLogo(doc, 625, 705, 166, 105)) {
+    text(doc, 'CAMPO DO GADO', 631, 741, 15, { bold: true });
+  }
   const machine=String(desenho.equipamento_nome||cadData.equipamento_nome||'NÃO INFORMADO');
   const drafter=String(cadData.desenhista||desenho.criado_por_nome||'NÃO INFORMADO');
   text(doc,'EQUIPAMENTO',829,702,8,{bold:true});
