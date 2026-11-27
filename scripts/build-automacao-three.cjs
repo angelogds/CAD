@@ -14,3 +14,10 @@ if (!controls.includes("from 'three'")) throw new Error('Import de OrbitControls
 fs.writeFileSync(path.join(target, 'OrbitControls.js'), controls.replace("from 'three'", "from './three.module.min.js'"));
 fs.writeFileSync(path.join(target, 'package.json'), JSON.stringify({ private: true, type: 'module', version }) + '\n');
 console.log('[2A] Three.js ' + version + ', OrbitControls e licença preparados para servir localmente.');
+
+// Operações nas seções do eixo com chaveta, também usadas no navegador.
+const polyboolDist = path.dirname(require.resolve('@velipso/polybool'));
+const polyboolTarget = path.resolve(__dirname, '../public/vendor/polybool');
+fs.mkdirSync(polyboolTarget, { recursive: true });
+fs.copyFileSync(path.join(polyboolDist, 'polybool.js'), path.join(polyboolTarget, 'polybool.mjs'));
+fs.copyFileSync(path.join(polyboolDist, '..', 'LICENSE'), path.join(polyboolTarget, 'LICENSE'));

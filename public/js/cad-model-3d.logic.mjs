@@ -1,5 +1,7 @@
 // Geometria de prévia: medidas explícitas do documento, sem inferir espessura,
 // chanfro ou furação. Não produz BREP/STEP nem modifica o desenho de origem.
+import { readKeyway } from './modules/desenho-tecnico/core/shaft-keyway.mjs';
+
 const EPS = 1e-7;
 const MAX_OBJECTS = 2000;
 const MAX_POINTS = 512;
@@ -55,7 +57,9 @@ function shaftDimensions(model) {
     }
     bore = { diameter, depth, from: 'start' };
   }
-  return { segments, bore, length, maxDiameter: Math.max(...segments.map((segment) => segment.diameter)) };
+  const keyway = readKeyway(model.keyway, segments[0], bore);
+  return { segments, bore, length, ...(keyway ? { keyway } : {}),
+    maxDiameter: Math.max(...segments.map((segment) => segment.diameter)) };
 }
 
 export function shaftProfilePoints(model) {

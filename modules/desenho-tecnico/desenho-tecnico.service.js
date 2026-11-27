@@ -311,6 +311,7 @@ function build3dFromCad(payload = {}) {
       length: model.total,
       maxDiameter: model.maxDiameter,
       bore: model.bore,
+      ...(model.keyway ? { keyway: model.keyway } : {}),
       crossHoles: model.crossHoles,
       previewOnly: Boolean(model.crossHoles.length || shaft.source === 'inferred-2d'),
       warnings,

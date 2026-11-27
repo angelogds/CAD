@@ -73,6 +73,20 @@ class ShaftStepTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_shaft({**self.shaft, "crossHoles": holes})
 
+    def test_keyway_machined_from_start_at_exact_depth(self):
+        segments = [{"length": 275, "diameter": 130}, {"length": 130, "diameter": 150},
+                    {"length": 500, "diameter": 177.8}]
+        for length in (150, 275):
+            with self.subTest(length=length):
+                keyway = {"length": length, "width": 40, "depth": 10}
+                result = make_step({"segments": segments, "keyway": keyway})
+                self.assertEqual(result["keyway"], keyway)
+                gross = sum(math.pi * (s["diameter"] / 2)**2 * s["length"] for s in segments)
+                cut_section = 20 * math.sqrt(65**2 - 20**2) + 65**2 * math.asin(20 / 65) - 40 * 55
+                self.assertAlmostEqual(result["volume_mm3"], gross - cut_section * length, delta=0.02)
+        with self.assertRaises(ValueError):
+            validate_shaft({"segments": segments, "keyway": {"length": 276, "width": 40, "depth": 10}})
+
 
 if __name__ == "__main__":
     unittest.main()

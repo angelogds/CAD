@@ -300,16 +300,21 @@ async function exportCadStep(req, res) {
     segments: model.segments,
     bore: model.bore,
     crossHoles: model.crossHoles,
+    ...(model.keyway ? { keyway: model.keyway } : {}),
   }, safeCode + '.step');
   if (!result.ok) {
     return res.status(result.status || 503).json({
       ok: false, error: result.error, available: result.available,
     });
   }
+  if (model.keyway && !['length', 'width', 'depth'].every(key => result.data?.keyway?.[key] === model.keyway[key])) {
+    return res.status(503).json({ ok: false, error: 'O motor CAD Python não confirmou o rasgo de chaveta no STEP.' });
+  }
   const raw = String(result.data?.content_base64 || '');
   const buffer = Buffer.from(raw, 'base64');
+  const header = 'ISO-10303-21;';
   if (!buffer.length || buffer.length > 8_000_000 ||
-      buffer.subarray(0, 12).toString('ascii') !== 'ISO-10303-21;') {
+      buffer.subarray(0, header.length).toString('ascii') !== header) {
     return res.status(502).json({ ok: false, error: 'CAD Python retornou STEP inválido.' });
   }
   res.setHeader('Content-Type', 'application/step');

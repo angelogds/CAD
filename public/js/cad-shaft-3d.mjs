@@ -1,6 +1,9 @@
 import * as THREE from '../vendor/three-0.172.0/three.module.min.js';
 import { OrbitControls } from '../vendor/three-0.172.0/OrbitControls.js';
-import { buildModel3D, shaftProfilePoints } from './cad-model-3d.logic.mjs';
+import polybool from '../vendor/polybool/polybool.mjs';
+import { buildModel3D, shaftProfilePoints } from './cad-model-3d.logic.mjs?v=20261127-chaveta';
+import { keywayLabel } from './modules/desenho-tecnico/core/shaft-keyway.mjs';
+import { shaftKeywayTriangles } from './cad-shaft-keyway-mesh.mjs';
 
 // Prévia em malha, sem exportação STEP/BREP. Não subtrai furações transversais:
 // essas entidades ficam indisponíveis, com o motivo, em vez de exibir um sólido incompleto.
@@ -9,6 +12,15 @@ export function shaftProfile(model) {
 }
 
 export function createModelGeometry(item) {
+  if (item.kind === 'shaft' && item.keyway) {
+    const triangles = shaftKeywayTriangles(item, {
+      polybool, Vector2: THREE.Vector2, triangulateShape: THREE.ShapeUtils.triangulateShape,
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(triangles.flat(2), 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }
   if (item.kind === 'shaft') return new THREE.LatheGeometry(shaftProfile(item), 96);
   const shape = new THREE.Shape();
   if (item.profile.type === 'circle') shape.absarc(0, 0, item.profile.radius, 0, Math.PI * 2, false);
@@ -217,6 +229,9 @@ export async function openDrawing3D({ cadData = {}, label = 'Desenho técnico' }
       if (warning) node.className = 'cg3d-warning'; notes.append(node);
     };
     addNote(`${model.items.length} componente(s) com volume definido · medidas em mm · estado atual do desenho`);
+    for (const item of model.items) {
+      if (item.keyway) addNote(keywayLabel(item.keyway));
+    }
     for (const warning of model.warnings || []) addNote(warning, true);
     for (const item of model.unsupported || []) addNote(`${item.id || item.kind}: ${item.reason}`, true);
     addNote('Prévia geométrica em malha; confira a prancha técnica e o STEP antes da fabricação.');

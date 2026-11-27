@@ -6,6 +6,7 @@ const imageService = require('./desenho-tecnico.image.service');
 const dimensionPdf = require('./desenho-tecnico.dimension-pdf');
 const layoutUtils = require('./desenho-tecnico.layout');
 const shaftSheet = require('./desenho-tecnico.shaft-sheet');
+const { keywayPlan } = require('./desenho-tecnico.shaft-keyway');
 
 const PDF_DIR = path.join(storagePaths.PDF_DIR, 'desenho-tecnico');
 if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
@@ -13,7 +14,7 @@ if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
 /**
  * Gera PDF técnico profissional para desenho CAD
  */
-function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
+async function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
   const filename = `${String(desenho.codigo || 'desenho').replace(/[^a-zA-Z0-9_-]+/g, '-')}-rev${desenho.revisao || 0}-${Date.now()}.pdf`;
   const fullPath = path.join(PDF_DIR, filename);
   const relPath = `/pdfs/desenho-tecnico/${filename}`;
@@ -21,6 +22,7 @@ function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
   const shaft = shaftSheet.pickShaft(cadData);
   const standaloneShaft = shaft && shaftSheet.isStandaloneShaft(cadData, shaft);
   if (standaloneShaft) return shaftSheet.generateShaftPdf(desenho, cadData, shaft, { pdfDir: PDF_DIR });
+  const shaftModel = shaft ? await shaftSheet.prepareSheetModel(shaft) : null;
   // Desenhos mistos (flange + eixo) preservam todas as entidades na primeira
   // folha e acrescentam uma prancha exclusiva do eixo. Nao esconder o flange.
   const mixedShaft = Boolean(shaft);
@@ -65,7 +67,7 @@ function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
 
   if (mixedShaft) {
     doc.addPage({ size: 'A3', layout: 'landscape', margin: 0 });
-    shaftSheet.renderShaftSheetPage(doc, desenho, cadData, shaft);
+    shaftSheet.renderShaftSheetPage(doc, desenho, cadData, shaft, shaftModel);
   }
   doc.end();
 
@@ -435,6 +437,12 @@ function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
     const height = orientation === 'horizontal' ? seg.diameter : seg.length;
     doc.rect(x * scale + offsetX, y * scale + offsetY, width * scale, height * scale).lineWidth(1.2).stroke('#0f172a');
     if (orientation === 'horizontal') currentX += seg.length; else currentY += seg.length;
+  }
+  const slot = keywayPlan(geometry);
+  if (slot.length) {
+    doc.moveTo(slot[0].x * scale + offsetX, slot[0].y * scale + offsetY);
+    for (const point of slot.slice(1)) doc.lineTo(point.x * scale + offsetX, point.y * scale + offsetY);
+    doc.lineWidth(1.2).stroke('#0f172a');
   }
 
   // Linha de centro

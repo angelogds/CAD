@@ -1,6 +1,6 @@
 <% layout("layout") %>
 
-<link rel="stylesheet" href="/css/cad-autocad.css">
+<link rel="stylesheet" href="/css/cad-autocad.css?v=20261127-chaveta">
 <link rel="stylesheet" href="/css/cad-system-shell.css">
 <link rel="stylesheet" href="/css/cad-solidworks-workbench.css?v=20261029-workspace-v1" data-cad-final2d-style="1">
 
@@ -218,16 +218,24 @@
   </div>
 
   <div class="cad-modal-overlay" id="cadShaftModal" hidden>
-    <form class="cad-modal cad-modal-wide" id="cadShaftForm">
-      <div class="cad-modal-header"><div><span class="cad-modal-kicker">Modelo paramétrico</span><h2>Eixo escalonado</h2></div><button class="cad-modal-close" data-shaft-close type="button" aria-label="Fechar">×</button></div>
+    <form class="cad-modal cad-modal-wide" id="cadShaftForm" role="dialog" aria-modal="true" aria-labelledby="cadShaftTitle">
+      <div class="cad-modal-header"><div><span class="cad-modal-kicker">Modelo paramétrico</span><h2 id="cadShaftTitle">Eixo escalonado</h2></div><button class="cad-modal-close" data-shaft-close type="button" aria-label="Fechar">×</button></div>
       <div class="cad-modal-body">
         <label class="cad-field cad-orientation-field"><span>Orientação</span><select class="cad-select" name="orientation"><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
         <table class="cad-shaft-segments"><thead><tr><th>Trecho</th><th>Comprimento (mm)</th><th>Diâmetro (mm)</th><th></th></tr></thead><tbody data-shaft-rows></tbody></table>
         <button class="cad-shaft-add" data-shaft-add type="button">+ Adicionar trecho</button>
-        <p class="cad-shaft-hint" style="margin:12px 0 4px;color:#94a3b8;font-size:12px">Informe somente comprimentos e diâmetros. Chanfros de representação serão desenhados nas extremidades; detalhes de furação/alojamento podem ser acrescentados posteriormente à prancha.</p>
+        <label class="cad-shaft-keyway-toggle"><input type="checkbox" name="hasKeyway" aria-controls="cadShaftKeywayFields"> Adicionar chaveta no primeiro trecho</label>
+        <fieldset class="cad-shaft-keyway-fields" id="cadShaftKeywayFields" hidden disabled>
+          <legend>Rasgo aberto na face inicial da ponta da polia</legend>
+          <div class="cad-shaft-keyway-grid">
+            <label class="cad-field"><span>Comprimento (mm)</span><input class="cad-input" name="keywayLength" type="number" min="0.001" step="0.001" required></label>
+            <label class="cad-field"><span>Largura (mm)</span><input class="cad-input" name="keywayWidth" type="number" min="0.001" step="0.001" required></label>
+            <label class="cad-field"><span>Profundidade (mm)</span><input class="cad-input" name="keywayDepth" type="number" min="0.001" step="0.001" required></label>
+          </div>
+        </fieldset>
         <p class="cad-form-error" data-shaft-error role="alert"></p>
       </div>
-      <div class="cad-modal-footer"><button class="cad-btn cad-btn-secondary" data-shaft-close type="button">Cancelar</button><button class="cad-btn cad-btn-primary" type="submit">Continuar e posicionar</button></div>
+      <div class="cad-modal-footer"><button class="cad-btn cad-btn-secondary" data-shaft-close type="button">Cancelar</button><button class="cad-btn cad-btn-primary" data-shaft-submit type="submit">Continuar e posicionar</button></div>
     </form>
   </div>
 </div>
@@ -244,6 +252,6 @@ window.addEventListener('error', function () {
   if (status) status.textContent = 'CAD carregado com limitações (ver console).';
 });
 </script>
-<script type="module" src="/js/cad-engine-v2.js?v=20261029-workspace-v1" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
+<script type="module" src="/js/cad-engine-v2.js?v=20261127-chaveta" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
 
 <style>body.cad-editor-mode { overflow: hidden; }</style>

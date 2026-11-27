@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const PDFDocument = require('pdfkit');
+const { normalizeKeyway } = require('./desenho-tecnico.shaft-keyway');
 
 const FONT = 'Helvetica';
 const BOLD = 'Helvetica-Bold';
@@ -163,6 +164,7 @@ function buildModel(shaft) {
     throw new Error('Alojamento deve caber inteiramente no primeiro trecho do eixo.');
   }
   const bore = boreDia ? { diameter: boreDia, depth: boreDepth, from: 'start' } : null;
+  const keyway = normalizeKeyway(geo.keyway, segments[0], bore);
   const holesInput = Array.isArray(geo.crossHoles) ? geo.crossHoles : [];
   const crossHoles = holesInput.map((hole, index) => {
     const position = positive(hole.distance);
@@ -175,7 +177,7 @@ function buildModel(shaft) {
     }
     return { distance: position, diameter };
   }).sort((a, b) => a.distance - b.distance);
-  return { segments, total, bore, crossHoles, maxDiameter: Math.max(...segments.map(s => s.diameter)) };
+  return { segments, total, bore, keyway, crossHoles, maxDiameter: Math.max(...segments.map(s => s.diameter)) };
 }
 
 function line(doc, x1, y1, x2, y2, width = .8, color = '#1f2937') {
@@ -189,6 +191,10 @@ function text(doc, value, x, y, size = 9, opts = {}) {
 
 function number(v) {
   return Number(v.toFixed(2)).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+}
+
+function keywayNumber(value) {
+  return value.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 }
 
 function arrow(doc, x, y, direction) {
@@ -220,7 +226,7 @@ function dashed(doc, x1, y1, x2, y2, pattern = [7, 4]) {
 }
 
 function drawLateral(doc, model, x, y, scale) {
-  const { segments, bore, crossHoles } = model;
+  const { segments, bore, crossHoles, keyway } = model;
   let acc = 0;
   const edge = seg => Math.min(1.5, seg.length * .045, seg.diameter * .025) * scale;
   segments.forEach((seg, idx) => {
@@ -275,6 +281,42 @@ function drawLateral(doc, model, x, y, scale) {
     text(doc, 'Ø' + number(seg.diameter), elbowX + 3, elbowY - 8, 9, {width:62});
     position += seg.length * scale;
   });
+  if (keyway) {
+    const end = x + keyway.length * scale;
+    const half = keyway.width * scale / 2;
+    doc.lineWidth(.9).strokeColor('#111827').moveTo(x, y - half)
+      .lineTo(end, y - half).lineTo(end, y + half).lineTo(x, y + half).stroke();
+    dimHorizontal(doc, x, end, 394, y + half, keywayNumber(keyway.length));
+  }
+}
+
+function drawKeywayEndView(doc, model, x, y) {
+  const { keyway, bore, segments } = model;
+  const radius = segments[0].diameter / 2;
+  const scale = Math.min(2.8, 66 / radius);
+  const half = keyway.width * scale / 2;
+  const floor = y - (radius - keyway.depth) * scale;
+  const rim = y - radius * scale;
+  const edgeAngle = Math.asin(keyway.width / (2 * radius));
+  for (let index = 0; index <= 96; index++) {
+    const angle = edgeAngle + (2 * Math.PI - 2 * edgeAngle) * index / 96;
+    const px = x + radius * scale * Math.sin(angle);
+    const py = y - radius * scale * Math.cos(angle);
+    if (index === 0) doc.moveTo(px, py); else doc.lineTo(px, py);
+  }
+  doc.lineTo(x - half, floor).lineTo(x + half, floor).closePath()
+    .lineWidth(1).strokeColor('#111827').stroke();
+  if (bore) doc.circle(x, y, bore.diameter * scale / 2).lineWidth(.8).stroke();
+  dashed(doc, x - radius * scale - 7, y, x + radius * scale + 7, y, [8, 3]);
+  dashed(doc, x - half, rim, x + half, rim, [5, 3]);
+  dimHorizontal(doc, x - half, x + half, y - radius * scale - 23, floor, keywayNumber(keyway.width));
+  const depthX = x + radius * scale + 20;
+  line(doc, x + half, rim, depthX + 4, rim, .5);
+  line(doc, x + half, floor, depthX + 4, floor, .5);
+  line(doc, depthX, rim, depthX, floor, .65);
+  text(doc, keywayNumber(keyway.depth), depthX + 8, (rim + floor) / 2 - 6, 10);
+  text(doc, 'VISTA DA PONTA DA POLIA', x - 110, y + radius * scale + 18, 10,
+    { bold: true, width: 220, align: 'center' });
 }
 
 function hatchRect(doc, x, y, w, h) {
@@ -297,13 +339,56 @@ function outlineWithHoles(doc, x, y, width, holes, scale) {
   if (cursor < x + width) line(doc, cursor, y, x + width, y, 1.1);
 }
 
+function drawKeywaySection(doc, model, x, y, scale) {
+  const { keyway, bore, crossHoles, segments: [first] } = model;
+  const top = y - first.diameter * scale / 2;
+  const bottom = y + first.diameter * scale / 2;
+  const holes = crossHoles.map(({ distance, diameter }) => [distance - diameter / 2, distance + diameter / 2]);
+  const cuts = [...new Set([0, keyway.length, bore?.depth ?? 0, ...holes.flat(), first.length])]
+    .sort((a, b) => a - b);
+  let previous = [];
+  const drawShoulder = (axial, left, right) => {
+    const boundaries = [...new Set([...left.flat(), ...right.flat()])].sort((a, b) => a - b);
+    for (let i = 1; i < boundaries.length; i++) {
+      const a = boundaries[i - 1], b = boundaries[i], middle = (a + b) / 2;
+      const includes = spans => spans.some(([lo, hi]) => lo < middle && middle < hi);
+      if (includes(left) !== includes(right)) line(doc, axial, a, axial, b, .9);
+    }
+  };
+  for (let i = 1; i < cuts.length; i++) {
+    const start = cuts[i - 1], end = cuts[i];
+    const middle = (start + end) / 2;
+    const startX = x + start * scale, endX = x + end * scale;
+    const surface = middle < keyway.length ? top + keyway.depth * scale : top;
+    let spans = [[surface, bottom]];
+    if (bore && middle < bore.depth) {
+      const r = bore.diameter * scale / 2;
+      spans = [[surface, y - r], [y + r, bottom]];
+    }
+    if (holes.some(([a, b]) => a < middle && middle < b)) spans = [];
+    for (const [lo, hi] of spans) {
+      hatchRect(doc, startX, lo, endX - startX, hi - lo);
+      line(doc, startX, lo, endX, lo, 1.1);
+      line(doc, startX, hi, endX, hi, 1.1);
+    }
+    drawShoulder(startX, previous, spans);
+    previous = spans;
+  }
+  drawShoulder(x + first.length * scale, previous, []);
+}
+
 function drawSection(doc, model, x, y, scale) {
-  const { segments, bore, crossHoles } = model;
+  const { segments, bore, crossHoles, keyway } = model;
   let start = x;
   segments.forEach((seg, idx) => {
     const width = seg.length * scale;
     const top = y - seg.diameter * scale / 2;
     const bottom = y + seg.diameter * scale / 2;
+    if (idx === 0 && keyway) {
+      drawKeywaySection(doc, model, x, y, scale);
+      start += width;
+      return;
+    }
     if (idx === 0 && bore) {
       const bt = y - bore.diameter * scale / 2;
       const bb = y + bore.diameter * scale / 2;
@@ -356,9 +441,11 @@ function drawSection(doc, model, x, y, scale) {
     line(doc,innerX,outerY,outerX,innerY,1);
   };
   const c1=bevel(first),c2=bevel(last),endX=x+model.total*scale;
-  cutCorner(x,y-first.diameter*scale/2,x+c1,y-first.diameter*scale/2+c1);
+  if (!keyway) cutCorner(x,y-first.diameter*scale/2,x+c1,y-first.diameter*scale/2+c1);
   cutCorner(x,y+first.diameter*scale/2,x+c1,y+first.diameter*scale/2-c1);
-  cutCorner(endX,y-last.diameter*scale/2,endX-c2,y-last.diameter*scale/2+c2);
+  if (!(keyway && segments.length === 1 && keyway.length === last.length)) {
+    cutCorner(endX,y-last.diameter*scale/2,endX-c2,y-last.diameter*scale/2+c2);
+  }
   cutCorner(endX,y+last.diameter*scale/2,endX-c2,y+last.diameter*scale/2-c2);
   dashed(doc, x - 9, y, x + model.total * scale + 14, y, [12, 4]);
   if (bore) {
@@ -382,6 +469,7 @@ function drawSection(doc, model, x, y, scale) {
  * Trata-se da vista isometrica vetorial da prancha, nao de STEP/BREP.
  */
 function drawIsometric(doc, model, ox, oy) {
+  if (model.keyway) return drawKeywayIsometric(doc, model, ox, oy);
   const unit = Math.min(1.58, 245 / model.total, 122 / model.maxDiameter);
   // A = eixo inclinado para direita/cima. B e C projetam a secao circular.
   const A = { x: 0.87, y: -0.44 };
@@ -489,6 +577,49 @@ function drawIsometric(doc, model, ox, oy) {
       .ellipse(c.x,c.y,size*.78,size*.56).fillAndStroke().restore();
   }
 }
+
+function drawKeywayIsometric(doc, model, ox, oy) {
+  const { Vector3 } = require('three');
+  const unit = Math.min(1.58, 245 / model.total, 122 / model.maxDiameter);
+  const view = new Vector3(.55, -.56, .62).normalize();
+  const horizontal = new Vector3(0, 0, 1).cross(view).normalize();
+  const vertical = view.clone().cross(horizontal).normalize();
+  const light = new Vector3(.35, -.4, 1).normalize();
+  const point = ([x, y, z]) => new Vector3(x, y, z);
+  const project = vector => [ox + unit * horizontal.dot(vector), oy - unit * vertical.dot(vector)];
+  const faces = model.triangles.map(triangle => {
+    const [a, b, c] = triangle.map(point);
+    const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+    const center = a.clone().add(b).add(c).multiplyScalar(1 / 3);
+    return { points: [a, b, c].map(project), normal, depth: view.dot(center) };
+  }).filter(face => face.normal.dot(view) > 0)
+    .sort((a, b) => a.depth - b.depth);
+  for (const { points: [a, b, c], normal } of faces) {
+    const shade = Math.round(112 + 100 * Math.max(0, normal.dot(light)));
+    const color = [shade, shade + 8, shade + 17];
+    doc.moveTo(...a).lineTo(...b).lineTo(...c).closePath()
+      .lineWidth(.12).fillAndStroke(color, color);
+  }
+  for (const hole of model.crossHoles) {
+    const radius = model.segments[0].diameter / 2;
+    const surface = radius - (hole.distance < model.keyway.length ? model.keyway.depth : 0);
+    const center = project(new Vector3(0, hole.distance, surface));
+    const size = Math.max(1.8, hole.diameter * unit * .4);
+    doc.fillColor('#263748').ellipse(...center, size * .78, size * .56).fill();
+  }
+}
+
+async function prepareSheetModel(shaft) {
+  const model = buildModel(shaft);
+  if (model.keyway) {
+    const { shaftKeywayTriangles } = await import('../../public/js/cad-shaft-keyway-mesh.mjs');
+    const { Vector2, ShapeUtils } = require('three');
+    const polybool = require('@velipso/polybool').default;
+    model.triangles = shaftKeywayTriangles(model, { polybool, Vector2, triangulateShape: ShapeUtils.triangulateShape });
+  }
+  return model;
+}
+
 function frame(doc, desenho, model, cadData) {
   const W = doc.page.width, H = doc.page.height;
   const logo = path.join(__dirname, '..', '..', 'public', 'IMG', 'logopdf_campo_do_gado.png.png');
@@ -508,7 +639,7 @@ function frame(doc, desenho, model, cadData) {
   text(doc,'CÓDIGO DO DESENHO',925,32,8,{width:220,align:'center'});
   text(doc,String(desenho.codigo||'S/C'),924,50,17,{bold:true,width:225,align:'center'});
   // Legendas nunca ficam em cima das cotas ou do carimbo.
-  text(doc,'CORTE A',254,382,12,{bold:true,width:210,align:'center'});
+  text(doc,model.keyway ? 'VISTA SUPERIOR' : 'CORTE A',254,model.keyway ? 414 : 382,12,{bold:true,width:210,align:'center'});
   text(doc,'CORTE A-A',240,649,12,{bold:true,width:230,align:'center'});
   text(doc,'VISTA ISOMÉTRICA',865,649,12,{bold:true,width:250,align:'center'});
   line(doc,23,693,W-23,693,1);
@@ -524,8 +655,14 @@ function frame(doc, desenho, model, cadData) {
   text(doc,model.crossHoles.length
     ? 'FUROS TRANSVERSAIS: '+model.crossHoles.map(h=>'Ø'+number(h.diameter)+' a '+number(h.distance)+' mm').join(' | ').slice(0,62)
     : 'FUROS TRANSVERSAIS: NÃO CADASTRADOS',36,778,8,{width:548});
-  text(doc,'ARESTAS/CHANFROS ILUSTRATIVOS: CONFIRMAR MEDIDA PARA USINAGEM.',
-    36,800,7,{width:548});
+  if (model.keyway) {
+    const { length, width, depth } = model.keyway;
+    text(doc,`CHAVETA (1ª FACE): ${keywayNumber(length)} × ${keywayNumber(width)} mm · PROF. ${keywayNumber(depth)} mm`,
+      36,793,8,{bold:true,width:548});
+  }
+  text(doc,model.keyway ? 'ARESTAS/CHANFROS ILUSTRATIVOS NA REPRESENTAÇÃO 2D.'
+    : 'ARESTAS/CHANFROS ILUSTRATIVOS: CONFIRMAR MEDIDA PARA USINAGEM.',
+    36,model.keyway ? 806 : 800,7,{width:548});
   try {
     if(fs.existsSync(logo))doc.image(logo,625,705,{fit:[166,105],align:'center',valign:'center'});
     else text(doc,'CAMPO DO GADO',631,741,15,{bold:true});
@@ -541,11 +678,11 @@ function frame(doc, desenho, model, cadData) {
     829,775,9,{width:322});
   text(doc,'FOLHA A3  |  REPRESENTAÇÃO SEM ESCALA',829,797,7,{width:330});
 }
-function renderShaftSheetPage(doc, desenho, cadData, shaft) {
-  const model=buildModel(shaft);
+function renderShaftSheetPage(doc, desenho, cadData, shaft, model) {
   const scaleA=Math.min(3.5,760/model.total,168/model.maxDiameter);
   const scaleSection=Math.min(3,620/model.total,160/model.maxDiameter);
   drawLateral(doc,model,116,275,scaleA);
+  if (model.keyway) drawKeywayEndView(doc,model,1023,265);
   drawSection(doc,model,103,535,scaleSection);
   drawIsometric(doc,model,855,556);
   frame(doc,desenho,model,cadData);
@@ -558,15 +695,15 @@ function renderShaftSheetPage(doc, desenho, cadData, shaft) {
   }
 }
 
-function generateShaftPdf(desenho, cadData, shaft, { pdfDir }) {
-  buildModel(shaft);
+async function generateShaftPdf(desenho, cadData, shaft, { pdfDir }) {
+  const model = await prepareSheetModel(shaft);
   const filename = `${String(desenho.codigo || 'eixo').replace(/[^a-zA-Z0-9_-]+/g, '-')}-eixo-rev${desenho.revisao || 0}-${Date.now()}.pdf`;
   const fullPath = path.join(pdfDir, filename);
   const relPath = `/pdfs/desenho-tecnico/${filename}`;
   const doc = new PDFDocument({ size: 'A3', layout: 'landscape', margin: 0, autoFirstPage: true });
   const out = fs.createWriteStream(fullPath);
   doc.pipe(out);
-  renderShaftSheetPage(doc, desenho, cadData, shaft);
+  renderShaftSheetPage(doc, desenho, cadData, shaft, model);
   doc.end();
   return new Promise((resolve, reject) => {
     out.on('finish', () => resolve({ fullPath, relPath, filename }));
@@ -574,4 +711,4 @@ function generateShaftPdf(desenho, cadData, shaft, { pdfDir }) {
   });
 }
 
-module.exports = { pickShaft, buildModel, isStandaloneShaft, renderShaftSheetPage, generateShaftPdf };
+module.exports = { pickShaft, buildModel, isStandaloneShaft, prepareSheetModel, renderShaftSheetPage, generateShaftPdf };

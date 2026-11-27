@@ -63,6 +63,30 @@ test('não inventa furação ou alojamento quando faltam as medidas', () => {
   assert.deepEqual(model.crossHoles, []);
 });
 
+test('preserva o rasgo opcional na ponta com as três medidas salvas', async () => {
+  const raw = sample();
+  const geometry = raw.objects[0].geometry;
+  geometry.keyway = { length: 100, width: 40, depth: 10 };
+  const { keyway } = geometry;
+  const { objects: [saved] } = sanitizeCadData(raw);
+  assert.deepEqual(saved.geometry.keyway, keyway);
+  assert.deepEqual(buildModel(saved).keyway, keyway);
+  assert.deepEqual(sanitizeCadData({ shaftSheet: geometry }).shaftSheet.keyway, keyway);
+  for (const invalid of [
+    { length: 121 }, { width: 127 }, { depth: 0 }, { depth: 16 }, { length: true },
+  ]) {
+    geometry.keyway = { ...keyway, ...invalid };
+    assert.throws(() => sanitizeCadData(raw), /Chaveta:/);
+  }
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-keyway-'));
+  try {
+    const { fullPath } = await generateShaftPdf({ codigo: 'CHAVETA-TESTE' }, {}, saved, { pdfDir: tmp });
+    assert.equal((fs.readFileSync(fullPath, 'latin1').match(/\/Type \/Page\b/g) || []).length, 1);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test('não permite furação na área de 100/150 mm nem além do alojamento', () => {
   const raw = sample();
   raw.objects[0].geometry.crossHoles.push({ distance: 150, diameter: 13 });
